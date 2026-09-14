@@ -29,48 +29,69 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
        uintptr_t free_range_end_address ;
 
     
-       size_t jk = 0;
-       while(jk<out_info->rsv_count)
-       {
+//        size_t jk = 0;
+//        while(jk<out_info->rsv_count)
+//        {
           
-          uart_puts(" \n  Here is a reserved region \n");
-          /* To print the start address of the reserved region */
-uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
-    uart_puts(" ------");
-/* To print the end address of the reserved region */
-uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
+//           uart_puts(" \n  Here is a reserved region \n");
+//           /* To print the start address of the reserved region */
+// uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
+//     uart_puts(" ------");
+// /* To print the end address of the reserved region */
+// uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
 
-        jk++;
-       }
-
-
-
-//       mkMAU_find_free_range_for_range_nodes_array(kernel_end,out_info,total_number_of_possible_nodes,&free_range_start_address,&free_range_end_address);
+//         jk++;
+//        }
 
 
-// //       uart_puts("Start address ------->");
-// //       uart_puthex(free_range_start_address);
-// //       uart_puts("  end address -->>");
-// //       uart_puthex(free_range_end_address);
+
+      mkMAU_find_free_range_for_range_nodes_array(kernel_start,out_info,total_number_of_possible_nodes,&free_range_start_address,&free_range_end_address);
+
+
+//       uart_puts("Start address ------->");
+//       uart_puthex(free_range_start_address);
+//       uart_puts("  end address -->>");
+//       uart_puthex(free_range_end_address);
       
 
-//        struct mkmau_node* memory_tracker_array = (struct mkmau_node*)free_range_start_address ;
-//        mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array);
+       struct mkmau_node* memory_tracker_array = (struct mkmau_node*)free_range_start_address ;
+       mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array);
      
 
 
 
 }
 
-void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_end_address , struct hardware_info *out_info , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address  )
+void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address , struct hardware_info *out_info , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address  )
 {
        uintptr_t start_address = out_info->ram_base_address;
-       uintptr_t end_address = out_info->rsv_regions[0].start ;
+   extern char _kernel_end[];     
+       uintptr_t end_address;
+             size_t node_size = sizeof(struct mkmau_node);
+       uintptr_t needed_size_for_array = node_size*number_of_maximum_nodes ;
+       if(out_info->rsv_regions[0].start<kernel_start_address)
+       {
+          end_address = out_info->rsv_regions[0].start ;
+       }
+       else
+       {
+        end_address = kernel_start_address ;
+         if(end_address-start_address>=needed_size_for_array)
+         {
+                              *free_range_start_address=start_address;
+                  *free_range_end_address   = start_address + needed_size_for_array;
+                  return ;
+         }
+         else
+         {
+            start_address = (uintptr_t)_kernel_end  ;
+            end_address = out_info->rsv_regions[0].start ; 
+         }
+       }
        uart_puts("--> start address of first reserved region \n");
        uart_puthex((uintptr_t)end_address);
         uart_puthex((uintptr_t)start_address);
-      size_t node_size = sizeof(struct mkmau_node);
-       uintptr_t needed_size_for_array = node_size*number_of_maximum_nodes ;
+
     size_t i =0 ;
        while(1)
        {

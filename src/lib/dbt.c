@@ -1,9 +1,12 @@
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
+#include "../../include/lib/quicksort.h"
 #include "../../include/mkMAU/mkMAU.h"
 #include<string.h>
 #include "../../include/driverHeaders/uart.h"
 #include "../../include/lib/alignbyte.h"
+
+
 
 #define FDT_BEGIN_NODE  0x00000001
 #define FDT_END_NODE    0x00000002
@@ -12,8 +15,30 @@
 #define FDT_END         0x00000009
  void traverse_totalsize (uintptr_t dbt_tree_ptr ,struct hardware_info *out_info);
 void traverse_off_dt_struct(uintptr_t dbt_tree_ptr, struct hardware_info *out_info);
+void traverse_reserved_regions_in_off_dt_struct (uintptr_t dbt_tree_ptr , struct hardware_info *out_info);
   void discard_dbt(uintptr_t dbt_tree_ptr , uintptr_t dbt_size);
   void traverse_off_mem_rsvmap(uintptr_t dbt_tree_ptr, struct hardware_info *out_info);
+
+
+int compare_start_address(const void *a, const void *b)
+{
+    const struct mkmau_node *node_a = (const struct mkmau_node *)a;
+    const struct mkmau_node *node_b = (const struct mkmau_node *)b;
+
+    if (node_a->base_range < node_b->base_range) return -1;
+    if (node_a->base_range > node_b->base_range) return 1;
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
  char* parsing_node_name(uint8_t** one_byte_tracker_pointer)
 {
     char *node_name = (char *)(*one_byte_tracker_pointer) ; 
@@ -41,6 +66,8 @@ int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info 
         
         traverse_off_dt_struct(dbt_tree_ptr , out_info);
         traverse_off_mem_rsvmap(dbt_tree_ptr,out_info);
+         traverse_reserved_regions_in_off_dt_struct ( dbt_tree_ptr , out_info);
+         array_sort(out_info->rsv_regions , sizeof(struct reserved_region) ,out_info->rsv_count ,compare_start_address);
         traverse_totalsize(dbt_tree_ptr,out_info);
      
 
@@ -128,11 +155,17 @@ if (prop_name[0] == 'r' && prop_name[1] == 'e' && prop_name[2] == 'g' && prop_na
 
            }
 
+           
+
   }
 
   void traverse_off_mem_rsvmap(uintptr_t dbt_tree_ptr, struct hardware_info *out_info)
-  {        struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header*)dbt_tree_ptr ;  
-
+  {      
+    
+    // Resereved regions it will give are 4 because other remaining 3 are part of dt struct offset as fdt nodes !
+    
+    struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header*)dbt_tree_ptr ;  
+          uart_puts("\n We are finding reserved regions \n");
          uint32_t offset_for_off_mem_rsvmap = __builtin_bswap32(fdt->off_mem_rsvmap);
          uint8_t* reserved_region_array_tracker = (uint8_t*)(dbt_tree_ptr+offset_for_off_mem_rsvmap);
          int total_numbers_of_rserved_regions = 0;
@@ -169,6 +202,8 @@ if (prop_name[0] == 'r' && prop_name[1] == 'e' && prop_name[2] == 'g' && prop_na
 
           if(reserved_region_address==0 && reserved_region_size==0)
           {
+            uart_puts("\n all regions found , total are \n");
+            uart_puthex(out_info->rsv_count);
             break;
           }
 
@@ -202,3 +237,94 @@ void discard_dbt(uintptr_t dbt_tree_ptr, uintptr_t dbt_size)
         zero_filler[i] = 0;
     }
 }
+
+
+
+
+void traverse_reserved_regions_in_off_dt_struct (uintptr_t dbt_tree_ptr , struct hardware_info *out_info)
+{
+    struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header *)dbt_tree_ptr;
+      uint32_t offset_for_dt_struct = __builtin_bswap32(fdt->off_dt_struct);     
+     uint8_t * one_byte_tracker_pointer = (uint8_t*)( dbt_tree_ptr + offset_for_dt_struct);
+     uint32_t offset_for_dt_string = __builtin_bswap32(fdt->off_dt_strings);
+
+     size_t resereved_memory_flag = 0 ;
+
+     while (1)
+     {
+
+          uint32_t token = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+          one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+ 
+          if(token == FDT_BEGIN_NODE)
+          {
+
+             char* node_name = parsing_node_name(&one_byte_tracker_pointer);
+
+             if(node_name[0]=='r'&&node_name[1]=='e'&&node_name[2]=='s'&&node_name[3]=='e'&&node_name[4]=='r'&&node_name[5]=='v'&&node_name[6]=='e'&&node_name[7]=='d'&&node_name[8]=='-'&&node_name[9]=='m'&&node_name[10]=='e'&&node_name[11]=='m'&&node_name[12]=='o'&&node_name[13]=='r'&&node_name[14]=='y'&&node_name[15]=='\0')
+             {
+              resereved_memory_flag=1;
+             }
+             
+
+          }
+          else if(token == FDT_PROP)
+          {
+               uint32_t len = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
+               one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+               uint32_t nameoff = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+               one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+
+               if(resereved_memory_flag && len==16)
+               {
+
+                   const char* prop_name = (char*)((uint8_t*)dbt_tree_ptr+nameoff+offset_for_dt_string);
+                   if(prop_name[0] == 'r' && prop_name[1] == 'e' && prop_name[2] == 'g' && prop_name[3] == '\0')
+                   {
+                          
+                    uint32_t first_half_address = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+                    one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+                    uint32_t second_half_address = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+                     uint64_t start_address_resevred_region = ((uint64_t)first_half_address<<32)|second_half_address;
+
+                     uint32_t first_half_size = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+                     uint32_t second_half_size = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+
+                     uint64_t full_size = ((uint64_t)first_half_size<<32) | second_half_size ;
+
+                     uint64_t end_address_resereved_region = start_address_resevred_region+full_size;
+
+                     int current_rsv_array_size = out_info->rsv_count;
+
+
+                      out_info->rsv_regions[current_rsv_array_size].start=start_address_resevred_region;
+                      out_info->rsv_regions[current_rsv_array_size].end=end_address_resereved_region;
+
+                      current_rsv_array_size++;
+                      out_info->rsv_count=current_rsv_array_size;
+                     
+
+                   }
+
+                   one_byte_tracker_pointer=one_byte_tracker_pointer+len;
+                   byte_alignment((void **)&one_byte_tracker_pointer);
+
+               }
+
+          }
+          else if(token == FDT_END)
+          {
+            break;
+          }
+
+
+
+     }
+  
+     uart_puts("\n Total Number of Reserved Regions Found are ======> \n");
+     uart_puthex(out_info->rsv_count);
+
+    }
