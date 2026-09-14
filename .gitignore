@@ -1,0 +1,18 @@
+# Entire build output directory (ignores all binary artifacts, DTBs, Images, .o, .elf)
+build/
+
+# Compiled object files & executables (wildcard safety)
+*.o
+*.elf
+*.bin
+*.img
+*.dtb
+*.iso
+
+# PowerShell & Scripting temp artifacts
+*.log
+
+# Editor & OS environment cleanups
+.vscode/
+.DS_Store
+Thumbs.db
