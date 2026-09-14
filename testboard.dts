@@ -1,0 +1,63 @@
+/dts-v1/;
+
+/* =========================================================================
+ * 1. BINARY HEADER RESERVATION TABLE (off_mem_rsvmap)
+ *    Only put critical system firmware reserves here.
+ * ========================================================================= */
+
+/* Reserve 1MB for custom DTB & early boot params @ 0x40000000 */
+/memreserve/ 0x0000000040000000 0x0000000000100000;
+
+/* ARM Trusted Firmware (TF-A / BL31) @ 0x40100000 (1MB) */
+/memreserve/ 0x0000000040100000 0x0000000000100000;
+
+/* OP-TEE Secure World RAM @ 0x40200000 (16MB) */
+/memreserve/ 0x0000000040200000 0x0000000001000000;
+
+/* GICv3 ITS Tables @ 0x41200000 (2MB) */
+/memreserve/ 0x0000000041200000 0x0000000000200000;
+
+
+/ {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    model = "ARM Cortex-A53 Reference Platform (BaseOS 512MB Layout)";
+    compatible = "arm,cortex-a53-virt", "arm,vexpress";
+
+    /* Total Physical Memory Pool: 512MB RAM @ 0x40000000 to 0x60000000 */
+    memory@40000000 {
+        device_type = "memory";
+        reg = <0x00000000 0x40000000 0x00000000 0x20000000>;
+    };
+
+    /* =========================================================================
+     * 2. STRUCTURE BLOCK RESERVED-MEMORY NODES
+     *    Non-overlapping dynamic & driver memory reservations.
+     * ========================================================================= */
+    reserved-memory {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        /* DMA Memory Pool for Devices @ 0x42000000 (8MB) */
+        dma_pool@42000000 {
+            compatible = "shared-dma-pool";
+            reg = <0x00000000 0x42000000 0x00000000 0x00800000>;
+            reusable;
+        };
+
+        /* Display Framebuffer Buffer @ 0x5E000000 (32MB) */
+        framebuffer@5e000000 {
+            reg = <0x00000000 0x5e000000 0x00000000 0x02000000>;
+            no-map;
+        };
+
+        /* Persistent Crash Log Buffer @ 0x5FE00000 (2MB) */
+        ramoops@5fe00000 {
+            compatible = "ramoops";
+            reg = <0x00000000 0x5fe00000 0x00000000 0x00200000>;
+            record-size = <0x00040000>;
+            console-size = <0x00040000>;
+        };
+    };
+};
