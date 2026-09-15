@@ -24,6 +24,18 @@
     model = "ARM Cortex-A53 Reference Platform (BaseOS 512MB Layout)";
     compatible = "arm,cortex-a53-virt", "arm,vexpress";
 
+    /* Minimal Interrupt Controller stub to satisfy interrupt-parent */
+    interrupt-parent = <&gic>;
+    
+    gic: interrupt-controller@8000000 {
+        compatible = "arm,gic-v3";
+        #interrupt-cells = <3>;
+        interrupt-controller;
+        #address-cells = <2>;
+        #size-cells = <2>;
+        reg = <0x0 0x08000000 0x0 0x10000>;
+    };
+
     /* Total Physical Memory Pool: 512MB RAM @ 0x40000000 to 0x60000000 */
     memory@40000000 {
         device_type = "memory";
@@ -31,7 +43,16 @@
     };
 
     /* =========================================================================
-     * 2. STRUCTURE BLOCK RESERVED-MEMORY NODES
+     * 2. STORAGE CONTROLLER NODE (VirtIO MMIO)
+     * ========================================================================= */
+    virtio_block@a000000 {
+        compatible = "virtio,mmio";
+        reg = <0x00000000 0x0a000000 0x00000000 0x00000200>;
+        interrupts = <0 42 4>;
+    };
+
+    /* =========================================================================
+     * 3. STRUCTURE BLOCK RESERVED-MEMORY NODES
      *    Non-overlapping dynamic & driver memory reservations.
      * ========================================================================= */
     reserved-memory {

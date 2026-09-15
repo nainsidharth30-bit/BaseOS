@@ -18,9 +18,12 @@ struct hardware_info {
     /* Array to hold scattered reserved regions */
     struct reserved_region rsv_regions[MAX_RESERVED_REGIONS];
     int rsv_count; /* Number of valid entries found */
-     
-      uint64_t uart_base_address;
-};
+     uintptr_t ssd_controller_base_address ;
+     uint64_t ssd_size ;
+     uint32_t ssd_blocks_size ;
+     uint32_t ssd_irq ;
+
+     };
 
   extern struct  hardware_info g_hw;
 

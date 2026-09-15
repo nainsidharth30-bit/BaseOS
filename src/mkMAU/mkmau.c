@@ -7,8 +7,11 @@
  #include"stddef.h"
  #define MMAU_SIZE 4096
 
-  void array_node_shift_end (struct mkmau_node* memory_tracker_array , size_t shift_units , size_t from_which_node ,size_t array_size );
- void mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array  );
+ struct mkmau_node *memory_tracker_array = NULL;
+ int memory_tracker_array_size ;
+
+ extern  void array_node_shift_end (struct mkmau_node* memory_tracker_array , size_t shift_units , size_t from_which_node ,size_t array_size );
+ int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array  );
  void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_end_address , struct hardware_info *out_info , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address ) ;
 
 void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)  
@@ -24,24 +27,25 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
       uint64_t size_of_available_ram = out_info->ram_size - ((uint64_t)kernel_size+(size_of_reserved_regions+1)); // we include kernel as reserved region but not the dtb tree region 
    uart_puts("\n size of free memory \n");
    uart_puthex((uintptr_t)size_of_available_ram);
+    uart_puts("\n \n");
       uintptr_t total_number_of_possible_nodes = size_of_available_ram/MMAU_SIZE ;
        uintptr_t free_range_start_address ;
        uintptr_t free_range_end_address ;
 
     
-//        size_t jk = 0;
-//        while(jk<out_info->rsv_count)
-//        {
+       size_t jk = 0;
+       while(jk<out_info->rsv_count)
+       {
           
-//           uart_puts(" \n  Here is a reserved region \n");
-//           /* To print the start address of the reserved region */
-// uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
-//     uart_puts(" ------");
-// /* To print the end address of the reserved region */
-// uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
+          uart_puts(" \n  Here is a reserved region \n");
+          /* To print the start address of the reserved region */
+uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
+    uart_puts(" ------");
+/* To print the end address of the reserved region */
+uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
 
-//         jk++;
-//        }
+        jk++;
+       }
 
 
 
@@ -54,11 +58,12 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 //       uart_puthex(free_range_end_address);
       
 
-       struct mkmau_node* memory_tracker_array = (struct mkmau_node*)free_range_start_address ;
-       mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array);
-     
+       memory_tracker_array = (struct mkmau_node*)free_range_start_address ;
+   memory_tracker_array_size =      mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array);
 
-
+   uart_puts("\n---------------- ------->\n");
+     uart_puthex(memory_tracker_array_size);
+      uart_puts("\n---------------- ------->\n");
 
 }
 
@@ -110,7 +115,7 @@ void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address 
        }
 }
 
- void mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array )
+ int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array )
  {     size_t tracker_array_size = 0;
           extern char _kernel_start[];
        uart_puts("we are in \n");
@@ -270,12 +275,22 @@ void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address 
 
              for(size_t j=0 ; j<tracker_array_size;j++)
              {
+                uintptr_t array_start = (uintptr_t)memory_tracker_array;
+    uintptr_t array_end = (uintptr_t)(memory_tracker_array + tracker_array_size);
               uart_puts(" start-->  ");
               uart_puthex(memory_tracker_array[j].base_range);
                   uart_puts(" end-->  ");
               uart_puthex(memory_tracker_array[j].end_range);
+              if(memory_tracker_array[j].base_range < array_end && memory_tracker_array[j].end_range > array_start)
+              {
+                   uart_puts("  \n?????????\n ");
+                   uart_puts("True");
+                   uart_puts("  \n?????????\n ");
+              }
+
              }
              uart_puts("  Itd done ");
+             return tracker_array_size;
 
 
  }

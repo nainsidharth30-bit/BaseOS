@@ -2,6 +2,7 @@
 #define MKMAU_H
 #include <stdint.h>
 #include "../lib/dbt.h"
+#include <stddef.h>
 
 #define MMAU_PAGE_SIZE 4096ULL
 
@@ -33,6 +34,7 @@ struct mkmau_node{
     uint64_t base_range ;
     uint64_t end_range;
     node_flag_t  if_free ;
+    size_t owner_pid ;
 };
 
 
