@@ -13,13 +13,13 @@
 #define FDT_PROP        0x00000003
 #define FDT_NOP         0x00000004
 #define FDT_END         0x00000009
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info) ;
  void traverse_totalsize (uintptr_t dbt_tree_ptr ,struct hardware_info *out_info);
-void traverse_off_dt_struct(uintptr_t dbt_tree_ptr, struct hardware_info *out_info);
-void traverse_reserved_regions_in_off_dt_struct (uintptr_t dbt_tree_ptr , struct hardware_info *out_info);
+void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info *out_info);
   void discard_dbt(uintptr_t dbt_tree_ptr , uintptr_t dbt_size);
-  void traverse_off_mem_rsvmap(uintptr_t dbt_tree_ptr, struct hardware_info *out_info);
-  void traverse_ssd_info_in_off_dt_struct(uintptr_t dbt_tree_ptr , struct hardware_info *out_info) ;
-
+  void   traverse_off_mem_rsvmap(uintptr_t,struct hardware_info *out_info);
+void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells , struct hardware_info* out_info);
+void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char compatibility[30]);
 
 int compare_start_address(const void *a, const void *b)
 {
@@ -59,103 +59,19 @@ int compare_start_address(const void *a, const void *b)
 
 int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info )
 {
-        //  if(!dbt_tree_ptr)
-        //  {
-        //     return -1 ;
-        //  } 
+         if(!dbt_tree_ptr)
+         {
+            return -1 ;
+         } 
 
         
-        traverse_off_dt_struct(dbt_tree_ptr , out_info);
         traverse_off_mem_rsvmap(dbt_tree_ptr,out_info);
-         traverse_reserved_regions_in_off_dt_struct ( dbt_tree_ptr , out_info);
-         array_sort(out_info->rsv_regions , sizeof(struct reserved_region) ,out_info->rsv_count ,compare_start_address);
-        traverse_totalsize(dbt_tree_ptr,out_info);
+       dtb_structure_blocks_parser(dbt_tree_ptr,out_info);
+        array_sort(out_info->rsv_regions , sizeof(struct reserved_region) ,out_info->rsv_count ,compare_start_address);
+       traverse_totalsize(dbt_tree_ptr,out_info);
      
 
 
-}
-
- void traverse_off_dt_struct(uintptr_t dbt_tree_ptr, struct hardware_info *out_info)
-{       
-    uart_puts("\n  traversing dbt dtruct \n");
-    struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header*)dbt_tree_ptr;  
-    uint32_t offset_for_off_dt_struct = __builtin_bswap32(fdt->off_dt_struct);
-    uint8_t* one_byte_tracker_pointer = (uint8_t*)dbt_tree_ptr + offset_for_off_dt_struct;
-    uint32_t offset_for_dt_string = __builtin_bswap32(fdt->off_dt_strings);
-    uint8_t is_memory_flag = 0;
-              
-    while(1)
-    {
-        uint32_t bigE_token = *(uint32_t*)one_byte_tracker_pointer;
-        uint32_t real_token = __builtin_bswap32(bigE_token);
-        one_byte_tracker_pointer = one_byte_tracker_pointer + 4;
-
-        if(real_token == FDT_BEGIN_NODE)
-        {
-            uart_puts("true fdt begin");
-            char* node_name = parsing_node_name(&one_byte_tracker_pointer);
-        } 
-        else if(real_token == FDT_PROP)
-        {
-            uint32_t len = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
-            one_byte_tracker_pointer = one_byte_tracker_pointer + 4;
-            uint32_t nameoff = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
-            one_byte_tracker_pointer = one_byte_tracker_pointer + 4;
-
-            const char* prop_name = (char*)((uint8_t*)dbt_tree_ptr + nameoff + offset_for_dt_string);
-
-            // Check if property name is "device_type"
-            if (prop_name[0] == 'd' && prop_name[1] == 'e' && prop_name[2] == 'v' && 
-                prop_name[3] == 'i' && prop_name[4] == 'c' && prop_name[5] == 'e' && 
-                prop_name[6] == '_' && prop_name[7] == 't' && prop_name[8] == 'y' && 
-                prop_name[9] == 'p' && prop_name[10] == 'e' && prop_name[11] == '\0')
-            {
-                const char* val = (const char*)one_byte_tracker_pointer;
-                // Check if value starts with "memory"
-                if (val[0] == 'm' && val[1] == 'e' && val[2] == 'm' && 
-                    val[3] == 'o' && val[4] == 'r' && val[5] == 'y')
-                {
-                    is_memory_flag = 1;
-                }
-            }
-
-            if(is_memory_flag)
-            {
-                // Check if property name is "reg"
-                if (prop_name[0] == 'r' && prop_name[1] == 'e' && prop_name[2] == 'g' && prop_name[3] == '\0')
-                {  
-                    uint32_t *reg_data = (uint32_t*)one_byte_tracker_pointer;
-                    
-                    // Read 64-bit Base Address (cells 0 and 1)
-                    uint64_t base_high_bits = __builtin_bswap32(reg_data[0]);
-                    uint64_t base_low_bits = __builtin_bswap32(reg_data[1]);
-                    uint64_t ram_base = (base_high_bits << 32) | base_low_bits;
-
-                    // Read 64-bit Size (cells 2 and 3)
-                    uint64_t size_high_bits = __builtin_bswap32(reg_data[2]);
-                    uint64_t size_low_bits = __builtin_bswap32(reg_data[3]);
-                    uint64_t ram_size = (size_high_bits << 32) | size_low_bits;
-
-                    out_info->ram_base_address = ram_base;
-                    out_info->ram_size = ram_size;
-
-                    break;
-                }
-            }
-
-            // Skip past the property value payload and align to the next 4-byte boundary
-            one_byte_tracker_pointer = one_byte_tracker_pointer + len;
-            byte_alignment((void **)&one_byte_tracker_pointer);
-        }
-        else if(real_token == FDT_END_NODE)
-        {
-            is_memory_flag = 0;
-        }
-        else if(real_token == FDT_END)
-        {
-            break;
-        }
-    }
 }
 
   void traverse_off_mem_rsvmap(uintptr_t dbt_tree_ptr, struct hardware_info *out_info)
@@ -238,107 +154,308 @@ void discard_dbt(uintptr_t dbt_tree_ptr, uintptr_t dbt_size)
 }
 
 
-
-
-void traverse_reserved_regions_in_off_dt_struct (uintptr_t dbt_tree_ptr , struct hardware_info *out_info)
+void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info *out_info)
 {
-    struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header *)dbt_tree_ptr;
-      uint32_t offset_for_dt_struct = __builtin_bswap32(fdt->off_dt_struct);     
-     uint8_t * one_byte_tracker_pointer = (uint8_t*)( dbt_tree_ptr + offset_for_dt_struct);
-     uint32_t offset_for_dt_string = __builtin_bswap32(fdt->off_dt_strings);
+       struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header *)dtb_tree_ptr ;
+       
+       uintptr_t base_of_structure_block = __builtin_bswap32(fdt->off_dt_struct)+dtb_tree_ptr;
+      
+       uintptr_t base_of_string_block = __builtin_bswap32(fdt->off_dt_strings)+dtb_tree_ptr ;
 
-     size_t resereved_memory_flag = 0 ;
+      uint8_t *one_byte_tracker_pointer = (uint8_t *)base_of_structure_block;
 
-     while (1)
-     {
+              uint32_t address_cells = 2;
+        uint32_t size_cells = 2; // we use default value 
 
-          uint32_t token = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-          one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+      
+
+       //  -------- FLAG SECTION  ---------------------//
  
-          if(token == FDT_BEGIN_NODE)
-          {
+           
 
-             char* node_name = parsing_node_name(&one_byte_tracker_pointer);
-
-             if(node_name[0]=='r'&&node_name[1]=='e'&&node_name[2]=='s'&&node_name[3]=='e'&&node_name[4]=='r'&&node_name[5]=='v'&&node_name[6]=='e'&&node_name[7]=='d'&&node_name[8]=='-'&&node_name[9]=='m'&&node_name[10]=='e'&&node_name[11]=='m'&&node_name[12]=='o'&&node_name[13]=='r'&&node_name[14]=='y'&&node_name[15]=='\0')
-             {
-              resereved_memory_flag=1;
-             }
-             
-
-          }
-          else if(token == FDT_PROP)
-          {
-               uint32_t len = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
-               one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-               uint32_t nameoff = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-               one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-
-               if(resereved_memory_flag && len==16)
-               {
-
-                   const char* prop_name = (char*)((uint8_t*)dbt_tree_ptr+nameoff+offset_for_dt_string);
-                   if(prop_name[0] == 'r' && prop_name[1] == 'e' && prop_name[2] == 'g' && prop_name[3] == '\0')
-                   {
-                          
-                    uint32_t first_half_address = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-                    one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-                    uint32_t second_half_address = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-                     uint64_t start_address_resevred_region = ((uint64_t)first_half_address<<32)|second_half_address;
-
-                     uint32_t first_half_size = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-                     uint32_t second_half_size = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
-                     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-
-                     uint64_t full_size = ((uint64_t)first_half_size<<32) | second_half_size ;
-
-                     uint64_t end_address_resereved_region = start_address_resevred_region+full_size;
-
-                     int current_rsv_array_size = out_info->rsv_count;
+         int memory_node_flag = 0;
+         int ssd_node_flag =0;
 
 
-                      out_info->rsv_regions[current_rsv_array_size].start=start_address_resevred_region;
-                      out_info->rsv_regions[current_rsv_array_size].end=end_address_resereved_region;
+       //----------- FLAG SECTION OVER ---------------//
 
-                      current_rsv_array_size++;
-                      out_info->rsv_count=current_rsv_array_size;
-                     
+       //---------------- Buffers ----------------------//
+         uint8_t *reg_buffer = NULL;
+          size_t reg_len = 0;
 
-                   }
+             uint8_t *irq_line_buffer = NULL;
+             size_t irq_line_len = 0;
 
-                   one_byte_tracker_pointer=one_byte_tracker_pointer+len;
-                   byte_alignment((void **)&one_byte_tracker_pointer);
+             uint8_t * interrupt_parent_buffer = NULL;
+             size_t interrupt_parent_len = 0;
 
-               }
-
-          }
-          else if(token == FDT_END)
-          {
-            break;
-          }
+             char compatible_buffer[30] = '\0';
 
 
 
-     }
-  
-     uart_puts("\n Total Number of Reserved Regions Found are ======> \n");
-     uart_puthex(out_info->rsv_count);
+       //----------------------------------Buffers Over --------//    
 
-    }
+       while(one_byte_tracker_pointer < (uint8_t *)base_of_structure_block + __builtin_bswap32(fdt->size_dt_struct))
+       {
 
+        uint32_t token = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+        one_byte_tracker_pointer=one_byte_tracker_pointer+4;
 
+        if(token==FDT_BEGIN_NODE)
+        {
+          address_cells=2;
+          size_cells=2;
+          memory_node_flag = 0 ;
+          ssd_node_flag=0;
+          reg_buffer=NULL;
+          reg_len=0;
+          irq_line_buffer=NULL;
+          irq_line_len=0;
+          interrupt_parent_buffer=NULL;
+          interrupt_parent_len=0;
+          compatible_buffer[30] = '\0'; 
+              while (*one_byte_tracker_pointer != '\0') 
+              {
+                one_byte_tracker_pointer++;
+              }
+    one_byte_tracker_pointer++;
+    byte_alignment((void **)&one_byte_tracker_pointer);
+        }
 
-    void traverse_ssd_info_in_off_dt_struct(uintptr_t dbt_tree_ptr , struct hardware_info *out_info)
+      else  if(token == FDT_PROP)
+        {
+
+    uint32_t len = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer );
+    one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+    uint32_t nameoff = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer );
+    one_byte_tracker_pointer=one_byte_tracker_pointer+4;
+
+    const char* prop_name = (const char *)(base_of_string_block + nameoff);
+
+    if(prop_name[0]=='#'&&prop_name[1]=='a'&&prop_name[2]=='d'&&prop_name[3]=='d'&&prop_name[4]=='r'&&prop_name[5]=='e'&&prop_name[6]=='s'&&prop_name[7]=='s'&&prop_name[8]=='-'&&prop_name[9]=='c'&&prop_name[10]=='e'&&prop_name[11]=='l'&&prop_name[12]=='l'&&prop_name[13]=='s'&&prop_name[14]=='\0')
     {
-         struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header*)dbt_tree_ptr ;  
-           uint32_t offset_for_off_dt_struct  =  __builtin_bswap32((fdt->off_dt_struct) ) ;
-             uint8_t* one_byte_tracker_pointer = (uint8_t *)dbt_tree_ptr+offset_for_off_dt_struct ;
-             uint32_t offset_for_dt_string = __builtin_bswap32(fdt->off_dt_strings);
-                int ssd_block_flag = 0 ;
-             while(1)
+        address_cells = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
+        
+    }
+
+        if(prop_name[0]=='#'&&prop_name[1]=='s'&&prop_name[2]=='i'&&prop_name[3]=='z'&&prop_name[4]=='e'&&prop_name[5]=='-'&&prop_name[6]=='c'&&prop_name[7]=='e'&&prop_name[8]=='l'&&prop_name[9]=='l'&&prop_name[10]=='s'&&prop_name[11]=='\0')
+    {
+               size_cells = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer);
+        
+    }
+
+        if(prop_name[0]=='d'&&prop_name[1]=='e'&&prop_name[2]=='v'&&prop_name[3]=='i'&&prop_name[4]=='c'&&prop_name[5]=='e'&&prop_name[6]=='_'&&prop_name[7]=='t'&&prop_name[8]=='y'&&prop_name[9]=='p'&&prop_name[10]=='e'&&prop_name[11]=='\0')
+    {
+             if(len==7)
              {
+              if(one_byte_tracker_pointer[0]=='m'&&one_byte_tracker_pointer[1]=='e'&&one_byte_tracker_pointer[2]=='m'&&one_byte_tracker_pointer[3]=='o'&&one_byte_tracker_pointer[4]=='r'&&one_byte_tracker_pointer[5]=='y'&&one_byte_tracker_pointer[6]=='\0')
+              {
+                  memory_node_flag = 1;
+              }
 
              }
     }
+
+        if(prop_name[0]=='c'&&prop_name[1]=='o'&&prop_name[2]=='m'&&prop_name[3]=='p'&&prop_name[4]=='a'&&prop_name[5]=='t'&&prop_name[6]=='i'&&prop_name[7]=='b'&&prop_name[8]=='l'&&prop_name[9]=='e'&&prop_name[10]=='\0')
+    {
+           if (len == 12 &&
+        one_byte_tracker_pointer[0]=='v' &&one_byte_tracker_pointer[1]=='i' &&one_byte_tracker_pointer[2]=='r' &&one_byte_tracker_pointer[3]=='t' &&one_byte_tracker_pointer[4]=='i' && one_byte_tracker_pointer[5]=='o' &&one_byte_tracker_pointer[6]==',' &&one_byte_tracker_pointer[7]=='m' &&one_byte_tracker_pointer[8]=='m' &&one_byte_tracker_pointer[9]=='i' && one_byte_tracker_pointer[10]=='o' &&one_byte_tracker_pointer[11]=='\0')
+    {
+      compatible_buffer[30] = 'virtio,mmio';
+        ssd_node_flag = 1;
+    }
+    }
+      if(prop_name[0]=='r'&&prop_name[1]=='e'&&prop_name[2]=='g'&&prop_name[3]=='\0')
+      {
+
+             reg_buffer = one_byte_tracker_pointer ;
+             reg_len = len ; 
+
+      }
+      if(prop_name[0]=='i'&&prop_name[1]=='n'&&prop_name[2]=='t'&&prop_name[3]=='e'&&prop_name[4]=='r'&&prop_name[5]=='r'&&prop_name[6]=='u'&&prop_name[7]=='p'&&prop_name[8]=='t'&&prop_name[9]=='s'&&prop_name[10]=='\0')
+      {
+            irq_line_buffer=one_byte_tracker_pointer;
+            irq_line_len=len;
+      }
+
+      if(prop_name[0]=='i'&&prop_name[1]=='n'&&prop_name[2]=='t'&&prop_name[3]=='e'&&prop_name[4]=='r'&&prop_name[5]=='r'&&prop_name[6]=='u'&&prop_name[7]=='p'&&prop_name[8]=='t'&&prop_name[9]=='-'&&prop_name[10]=='p'&&prop_name[11]=='a'&&prop_name[12]=='r'&&prop_name[13]=='e'&&prop_name[14]=='n'&&prop_name[15]=='t'&&prop_name[16]=='\0')
+      {
+         interrupt_parent_buffer=one_byte_tracker_pointer;
+         interrupt_parent_len=len;
+      }
+
+      
+
+
+
+    one_byte_tracker_pointer = one_byte_tracker_pointer+len;
+     byte_alignment((void **)&one_byte_tracker_pointer);
+
+
+        }
+        else if(token==FDT_NOP)
+        {
+          // Do nothing , I have no info
+        }
+        else if(token == FDT_END_NODE)
+        {
+
+
+          if(memory_node_flag && reg_buffer)
+      {
+        extract_ram_info(reg_buffer,reg_len,address_cells,size_cells,out_info);
+      }
+
+      if(ssd_node_flag && reg_buffer)
+      {
+        extract_ssd_mmio_size(reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
+      }
+
+      if(ssd_node_flag&&irq_line_buffer)
+      {
+        // Call a function
+      }
+
+      if(ssd_node_flag&&interrupt_parent_buffer)
+      {
+        //call a function
+      }
+
+          // I am the end of the node , Reset every variable 
+          memory_node_flag = 0 ;
+          ssd_node_flag=0;
+          reg_buffer=NULL;
+          reg_len=0;
+          irq_line_buffer=NULL;
+          irq_line_len=0;
+          interrupt_parent_buffer=NULL;
+          interrupt_parent_len=0;
+          compatible_buffer[30] = '\0';
+         
+        }
+        else
+        {
+          // I am the end of the whole DTB tree 
+          break;
+        }
+               
+
+       }
+      
+
+}
+
+void extract_ram_info(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info)
+{
+    uint64_t ram_base = 0;
+    uint64_t ram_size = 0;
+
+    uint32_t total_cells = address_cells + size_cells;
+
+    if (total_cells == 0)
+    {
+        return;
+    }
+
+    if (len_to_read < (size_t)(total_cells * 4))
+    {
+        return;
+    }
+
+    if (address_cells > 2)
+    {
+        address_cells = 2;
+    }
+
+    if (size_cells > 2)
+    {
+        size_cells = 2;
+    }
+
+    uint32_t iterator = 0;
+
+             while (iterator < address_cells)
+    {
+        uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + iterator * 4));
+                ram_base = (ram_base << 32) | one_cell;
+                 iterator++;
+    }
+
+               iterator = 0;
+
+                  while (iterator < size_cells)
+            {
+                 uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + address_cells * 4 + iterator * 4));
+        ram_size = (ram_size << 32) | one_cell;
+                iterator++;
+         }
+
+                    out_info->ram_base_address = ram_base;
+                     out_info->ram_size = ram_size;
+}
+
+void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char compatibility[30])
+{
+      uint64_t mmio_base = 0;
+    uint64_t mmio_size = 0;
+
+    uint32_t total_cells = address_cells + size_cells;
+
+    if (total_cells == 0)
+    {
+        return;
+    }
+
+    if (len_to_read < (size_t)(total_cells * 4))
+    {
+        return;
+    }
+
+    if (address_cells > 2)
+    {
+        address_cells = 2;
+    }
+
+    if (size_cells > 2)
+    {
+        size_cells = 2;
+    }
+
+    uint32_t iterator = 0;
+
+             while (iterator < address_cells)
+    {
+        uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + iterator * 4));
+                mmio_base = (mmio_base << 32) | one_cell;
+                 iterator++;
+    }
+
+               iterator = 0;
+
+                  while (iterator < size_cells)
+            {
+                 uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + address_cells * 4 + iterator * 4));
+        mmio_size = (mmio_size << 32) | one_cell;
+                iterator++;
+         }
+
+         struct device_entry * node;
+
+
+                    node->mmio_base_address = mmio_base;
+                     node->mmio_size = mmio_size;
+
+
+                     uart_puts("\n MMIO base address \n");
+                     uart_puthex(node->mmio_base_address);
+                                          uart_puts("\n MMIO size  \n");
+                     uart_puthex(node->mmio_size);
+                     uart_puts("\n Check if it is correct  \n");
+
+}
+
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info)
+{
+
+}
+
