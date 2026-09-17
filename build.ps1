@@ -16,6 +16,7 @@ aarch64-none-elf-gcc -c src/assemblycode/boot.s -o build/boot.o
 aarch64-none-elf-gcc -c src/ccode/main.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/main.o
 aarch64-none-elf-gcc -c src/ccode/trampoline.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/trampoline.o
 aarch64-none-elf-gcc -c src/driverCode/uart.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/uart.o
+aarch64-none-elf-gcc -c src/driverCode/stack_track.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/stack_track.o
 aarch64-none-elf-gcc -c src/mkMAU/mkmau.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/mkmau.o
 aarch64-none-elf-gcc -c src/mkMAU/mkmau_utils.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/mkmau_utils.o
 aarch64-none-elf-gcc -c src/mkMAU/mobilemkMAU.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/mobilemkMAU.o
@@ -24,7 +25,7 @@ aarch64-none-elf-gcc -c src/lib/alignbyte.c -Iinclude/driverHeaders -Iinclude/mk
 aarch64-none-elf-gcc -c src/lib/quicksort.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib -o build/quicksort.o
 
 # 4. Link object files into ELF
-aarch64-none-elf-ld --no-warn-rwx-segments -T linker/linker.ld build/boot.o build/main.o build/trampoline.o build/uart.o build/mkmau.o build/mkmau_utils.o build/mobilemkMAU.o build/dbt.o build/alignbyte.o build/quicksort.o -o build/boot.elf
+aarch64-none-elf-ld --no-warn-rwx-segments -T linker/linker.ld build/boot.o build/main.o build/trampoline.o build/uart.o build/stack_track.o build/mkmau.o build/mkmau_utils.o build/mobilemkMAU.o build/dbt.o build/alignbyte.o build/quicksort.o -o build/boot.elf
 
 # 5. Extract flat raw binary from ELF
 aarch64-none-elf-objcopy -O binary build/boot.elf build/Image
@@ -55,9 +56,6 @@ Write-ExtensionToSector "first_extension.bin" $ssdPath 512 1024
 Write-ExtensionToSector "second_extension.bin" $ssdPath 512 2048
 
 # 7. Launch QEMU BaseOS Environment:
-#    - Pass custom DTB natively (replaces internal DTB at 0x40000000)
-#    - Load Kernel Image at 0x41400000 and start CPU 0 execution
-#    - Attach emulated SSD via virtio-blk
 qemu-system-aarch64 `
   -M virt `
   -cpu cortex-a53 `

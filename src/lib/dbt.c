@@ -5,6 +5,7 @@
 #include<string.h>
 #include "../../include/driverHeaders/uart.h"
 #include "../../include/lib/alignbyte.h"
+#include "../../include/driverHeaders/track_stack.h"
 
 
 
@@ -13,13 +14,14 @@
 #define FDT_PROP        0x00000003
 #define FDT_NOP         0x00000004
 #define FDT_END         0x00000009
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info) ;
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info , struct device_entry* device_node);
+void extract_ssd_gic_phandle_data(uint8_t* base_address  , struct device_entry* device_node);
  void traverse_totalsize (uintptr_t dbt_tree_ptr ,struct hardware_info *out_info);
 void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info *out_info);
   void discard_dbt(uintptr_t dbt_tree_ptr , uintptr_t dbt_size);
   void   traverse_off_mem_rsvmap(uintptr_t,struct hardware_info *out_info);
 void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells , struct hardware_info* out_info);
-void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char compatibility[30]);
+void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char* compatibility);
 
 int compare_start_address(const void *a, const void *b)
 {
@@ -155,7 +157,7 @@ void discard_dbt(uintptr_t dbt_tree_ptr, uintptr_t dbt_size)
 
 
 void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info *out_info)
-{
+{    uart_puts("\n I am inside block parser \n");
        struct flattened_device_tree_header *fdt = (struct flattened_device_tree_header *)dtb_tree_ptr ;
        
        uintptr_t base_of_structure_block = __builtin_bswap32(fdt->off_dt_struct)+dtb_tree_ptr;
@@ -164,9 +166,52 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
       uint8_t *one_byte_tracker_pointer = (uint8_t *)base_of_structure_block;
 
+      struct device_entry device_node ;
+      struct device_entry * device_node_ptr=&device_node;
+
               uint32_t address_cells = 2;
         uint32_t size_cells = 2; // we use default value 
 
+        uint32_t  interrupt_cells = 0 ;
+       uart_puts("\n I am inside block parser \n");
+
+
+
+       //------------------SSD CONTROLLERS ARRAY ----------//
+       static const char *ssd_compatibles[] = {
+    /* --- Virtual / Generic --- */
+    "virtio,mmio",              /* QEMU, KVM, Firecracker */
+    "generic-ahci",             /* Fallback for any standard AHCI */
+
+    /* --- NVMe (PCIe SSDs) --- */
+    "nvme",                     /* Standard PCIe NVMe */
+    "apple,nvme-ans2",          /* Apple Silicon */
+    "qcom,ufshc",               /* Qualcomm UFS (often used as boot storage) */
+
+    /* --- UFS (Universal Flash Storage) --- */
+    "jedec,ufs-1.1",            /* UFS 1.1 standard */
+    "jedec,ufs-2.0",            /* UFS 2.0+ standard (mobile/embedded) */
+    "qcom,ufshc",               /* Qualcomm UFS host */
+
+    /* --- SATA / AHCI (Embedded & Server) --- */
+    "snps,dwc-ahci",            /* Synopsys DesignWare (most common IP) */
+    "snps,spear-ahci",          /* ST Spear */
+    "marvell,armada-3700-ahci", /* Marvell Armada */
+    "marvell,armada-8k-ahci",   /* Marvell Armada 8K */
+    "brcm,sata3-ahci",          /* Broadcom SATA3 */
+    "hisilicon,hisi-ahci",      /* HiSilicon */
+    "cavium,octeon-7130-ahci",  /* Cavium Octeon */
+
+    /* --- SD/MMC / eMMC (Most common on small RISC chips) --- */
+    "sdhci",                    /* Standard SD Host Controller Interface */
+    "snps,dw-mshc",             /* Synopsys DesignWare Mobile Storage */
+    "arm,pl180",                /* ARM PrimeCell (older) */
+    "mediatek,mt8173-mmc",      /* MediaTek */
+
+    NULL
+};
+
+//---------------- SSD CONTROLLERS ARRAY OVER --------//
       
 
        //  -------- FLAG SECTION  ---------------------//
@@ -189,11 +234,16 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
              uint8_t * interrupt_parent_buffer = NULL;
              size_t interrupt_parent_len = 0;
 
-             char compatible_buffer[30] = '\0';
+              uart_puts("\n I am inside block parser \n");
+             char compatible_buffer[12] = "";
+              uart_puts("\n I am inside block parser \n");
 
 
 
        //----------------------------------Buffers Over --------//    
+
+       uart_puts("\n Value of Size dt struct is \n");
+       uart_puthex(__builtin_bswap32(fdt->size_dt_struct));
 
        while(one_byte_tracker_pointer < (uint8_t *)base_of_structure_block + __builtin_bswap32(fdt->size_dt_struct))
        {
@@ -203,6 +253,7 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
         if(token==FDT_BEGIN_NODE)
         {
+          uart_puts(" \n Its a begin node \n");
           address_cells=2;
           size_cells=2;
           memory_node_flag = 0 ;
@@ -211,9 +262,7 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
           reg_len=0;
           irq_line_buffer=NULL;
           irq_line_len=0;
-          interrupt_parent_buffer=NULL;
-          interrupt_parent_len=0;
-          compatible_buffer[30] = '\0'; 
+          compatible_buffer[0] = '\0'; 
               while (*one_byte_tracker_pointer != '\0') 
               {
                 one_byte_tracker_pointer++;
@@ -224,7 +273,7 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
       else  if(token == FDT_PROP)
         {
-
+            uart_puts(" \n Its a PROP node \n");
     uint32_t len = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer );
     one_byte_tracker_pointer=one_byte_tracker_pointer+4;
     uint32_t nameoff = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer );
@@ -244,6 +293,15 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
         
     }
 
+    
+    if (prop_name[0]=='#' && prop_name[1]=='i' && prop_name[2]=='n' && prop_name[3]=='t' && prop_name[4]=='e' && prop_name[5]=='r' && prop_name[6]=='r' && prop_name[7]=='u' && prop_name[8]=='p' && prop_name[9]=='t' && prop_name[10]=='-' && prop_name[11]=='c' && prop_name[12]=='e' && prop_name[13]=='l' && prop_name[14]=='l' &&prop_name[15]=='s' && prop_name[16]=='\0')
+{
+  uart_puts("\n interrupts cells found \n");
+    interrupt_cells = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+}
+
+
+
         if(prop_name[0]=='d'&&prop_name[1]=='e'&&prop_name[2]=='v'&&prop_name[3]=='i'&&prop_name[4]=='c'&&prop_name[5]=='e'&&prop_name[6]=='_'&&prop_name[7]=='t'&&prop_name[8]=='y'&&prop_name[9]=='p'&&prop_name[10]=='e'&&prop_name[11]=='\0')
     {
              if(len==7)
@@ -258,12 +316,38 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
         if(prop_name[0]=='c'&&prop_name[1]=='o'&&prop_name[2]=='m'&&prop_name[3]=='p'&&prop_name[4]=='a'&&prop_name[5]=='t'&&prop_name[6]=='i'&&prop_name[7]=='b'&&prop_name[8]=='l'&&prop_name[9]=='e'&&prop_name[10]=='\0')
     {
-           if (len == 12 &&
-        one_byte_tracker_pointer[0]=='v' &&one_byte_tracker_pointer[1]=='i' &&one_byte_tracker_pointer[2]=='r' &&one_byte_tracker_pointer[3]=='t' &&one_byte_tracker_pointer[4]=='i' && one_byte_tracker_pointer[5]=='o' &&one_byte_tracker_pointer[6]==',' &&one_byte_tracker_pointer[7]=='m' &&one_byte_tracker_pointer[8]=='m' &&one_byte_tracker_pointer[9]=='i' && one_byte_tracker_pointer[10]=='o' &&one_byte_tracker_pointer[11]=='\0')
-    {
-      compatible_buffer[30] = 'virtio,mmio';
-        ssd_node_flag = 1;
-    }
+                     for(int ssd_compatible_iterator = 0 ; ssd_compatibles[ssd_compatible_iterator]!=NULL;ssd_compatible_iterator++)
+            {
+                const char* ssd_controller_name = ssd_compatibles[ssd_compatible_iterator];
+
+                uint8_t match_found_flag = 0 ;
+                uint8_t per_char_iterator = 0 ;
+
+                while(ssd_controller_name[per_char_iterator]==one_byte_tracker_pointer[per_char_iterator])
+                {
+                   per_char_iterator++ ;
+                   if(ssd_controller_name[per_char_iterator]=='\0' && one_byte_tracker_pointer[per_char_iterator]=='\0')
+                   {
+                    match_found_flag=1;
+                   }
+                }
+
+                if(match_found_flag)
+                {
+                   ssd_node_flag=1;
+                   
+                   uint8_t i = 0 ;
+                   while(ssd_controller_name[i]!='\0')
+                   {
+                    compatible_buffer[i]=ssd_controller_name[i];
+                    i++;
+                   }
+                    compatible_buffer[i]='\0';
+                   break;
+                }
+                
+
+            }
     }
       if(prop_name[0]=='r'&&prop_name[1]=='e'&&prop_name[2]=='g'&&prop_name[3]=='\0')
       {
@@ -274,12 +358,14 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
       }
       if(prop_name[0]=='i'&&prop_name[1]=='n'&&prop_name[2]=='t'&&prop_name[3]=='e'&&prop_name[4]=='r'&&prop_name[5]=='r'&&prop_name[6]=='u'&&prop_name[7]=='p'&&prop_name[8]=='t'&&prop_name[9]=='s'&&prop_name[10]=='\0')
       {
+        uart_puts("\n  irq buffer found \n");
             irq_line_buffer=one_byte_tracker_pointer;
             irq_line_len=len;
       }
 
       if(prop_name[0]=='i'&&prop_name[1]=='n'&&prop_name[2]=='t'&&prop_name[3]=='e'&&prop_name[4]=='r'&&prop_name[5]=='r'&&prop_name[6]=='u'&&prop_name[7]=='p'&&prop_name[8]=='t'&&prop_name[9]=='-'&&prop_name[10]=='p'&&prop_name[11]=='a'&&prop_name[12]=='r'&&prop_name[13]=='e'&&prop_name[14]=='n'&&prop_name[15]=='t'&&prop_name[16]=='\0')
       {
+        uart_puts("Setting interupt-parent bufer");
          interrupt_parent_buffer=one_byte_tracker_pointer;
          interrupt_parent_len=len;
       }
@@ -307,18 +393,29 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
       }
 
       if(ssd_node_flag && reg_buffer)
-      {
-        extract_ssd_mmio_size(reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
+      { uart_puts("\n Extracting , flag is true \n");
+        track_stack();
+        extract_ssd_mmio_size(device_node_ptr,reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
       }
-
+      uart_puts("\n");
+      uart_puts("\n irq line buffer ====== ");
+      uart_puthex((uintptr_t)irq_line_buffer);
+      uart_puts("\n");
+      uart_puts("\nssd node flag value = ");
+      uart_puthex(ssd_node_flag);
+      uart_puts("\n");
       if(ssd_node_flag&&irq_line_buffer)
       {
-        // Call a function
+        uart_puts("\n Hello I will print irqline data \n");
+        extract_ssd_irq_line_data(irq_line_buffer,irq_line_len,interrupt_cells,out_info,device_node_ptr);
       }
 
       if(ssd_node_flag&&interrupt_parent_buffer)
       {
-        //call a function
+        uart_puts("Helio ++++++++++++");
+        extract_ssd_gic_phandle_data(interrupt_parent_buffer,device_node_ptr);
+        uart_puts("/n Here is the phandle value =====");
+        uart_puthex(device_node_ptr->interrupt_controller_phandle);
       }
 
           // I am the end of the node , Reset every variable 
@@ -328,9 +425,7 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
           reg_len=0;
           irq_line_buffer=NULL;
           irq_line_len=0;
-          interrupt_parent_buffer=NULL;
-          interrupt_parent_len=0;
-          compatible_buffer[30] = '\0';
+          compatible_buffer[0] = '\0'; 
          
         }
         else
@@ -394,10 +489,15 @@ void extract_ram_info(uint8_t *base_address, size_t len_to_read,uint32_t address
                      out_info->ram_size = ram_size;
 }
 
-void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char compatibility[30])
-{
+void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char* compatibility)
+{    
+
+  uart_puts("Hello dost") ;
+      uart_puts("\n Outside the while loop ");
       uint64_t mmio_base = 0;
+       uart_puts("\n Outside the while loop ");
     uint64_t mmio_size = 0;
+     uart_puts("\n Outside the while loop ");
 
     uint32_t total_cells = address_cells + size_cells;
 
@@ -422,7 +522,7 @@ void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t ad
     }
 
     uint32_t iterator = 0;
-
+ 
              while (iterator < address_cells)
     {
         uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + iterator * 4));
@@ -439,23 +539,58 @@ void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t ad
                 iterator++;
          }
 
-         struct device_entry * node;
+         
 
 
-                    node->mmio_base_address = mmio_base;
-                     node->mmio_size = mmio_size;
+                    device_node->mmio_base_address = mmio_base;
+                     device_node->mmio_size = mmio_size;
 
 
                      uart_puts("\n MMIO base address \n");
-                     uart_puthex(node->mmio_base_address);
+                     uart_puthex(device_node->mmio_base_address);
                                           uart_puts("\n MMIO size  \n");
-                     uart_puthex(node->mmio_size);
+                     uart_puthex(device_node->mmio_size);
                      uart_puts("\n Check if it is correct  \n");
+                     uart_puts("\n We will print compatibblw \n");
+                      uart_puts(compatibility);
+                     int i=0;
+                     while(compatibility[i]!='\0')
+                     {
+                      device_node->compatible[i]=compatibility[i];
+                      i++;
+                     }
+                     device_node->compatible[i]='\0';
+                        uart_puts("\n We will print compatibblw \n");
+                     uart_puts(device_node->compatible);
+
+            
+                     
+                  
 
 }
 
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info)
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info , struct device_entry* device_node)
 {
+       
+       device_node->irq_cells_count=interrupt_cells;
 
+       uint32_t * tracker_pointer = (uint32_t*)base_address ;
+        int i=0 ;
+       while((uint8_t*)tracker_pointer<base_address+len_to_read)
+       {
+        device_node->irq_cells[i]=__builtin_bswap32(*tracker_pointer);
+        tracker_pointer=tracker_pointer+1;
+        i++;
+       }
+    uart_puts("=================");
+       uart_puthex(device_node->irq_cells_count);
+       
+
+}
+
+void extract_ssd_gic_phandle_data(uint8_t* base_address  , struct device_entry* device_node)
+{
+  uint32_t * reader = (uint32_t*)base_address;
+  device_node->interrupt_controller_phandle=__builtin_bswap32(*reader );
 }
 

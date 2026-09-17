@@ -10,6 +10,8 @@ SO , this file is really important because it will show how I think , so lets st
 
   1. BaseOS dont know about if user apps exists or not  , it only knows about extensions , if there is some memory managing extension asking for memory on behalf os User App A than it still will be putted in account of that extension ! 
   2. Extensions also runs on kernel privileges , it is the user work to add secure extensions ! 
-
+ 
+ 
+  
 
   

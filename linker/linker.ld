@@ -12,12 +12,12 @@ SECTIONS
         *(.text*)
     }
 
-    .rodata : { 
-        *(.rodata*) 
+    .rodata : {
+        *(.rodata*)
     }
 
-    .data : { 
-        *(.data*) 
+    .data : {
+        *(.data*)
     }
 
     .bss (NOLOAD) : {
@@ -32,8 +32,9 @@ SECTIONS
     /* Isolated Boot Stack (16 KB) */
     .stack (NOLOAD) : {
         . = ALIGN(16);
-        . += 0x4000;
-        _stack_top = .;
+        _stack_bottom = .;       /* lowest address the stack can reach */
+        . += 0x4000;             /* reserve 16 KB */
+        _stack_top = .;          /* highest address; SP starts here */
     }
 
     . = ALIGN(4096);

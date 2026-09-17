@@ -13,13 +13,12 @@ struct reserved_region {
 
  struct device_entry{
     uint32_t phandle ;
-    char compatible[70];
+    char compatible[30];
         uint64_t mmio_base_address;
     uint64_t mmio_size ;
-        uint32_t irq_cells[MAX_INTERRUPT_CELLS];
+    uint32_t irq_cells[MAX_INTERRUPT_CELLS];
     uint32_t irq_cells_count;
     uint32_t interrupt_controller_phandle;
-
  };
 
 struct hardware_info {
@@ -32,7 +31,7 @@ struct hardware_info {
     int rsv_count; /* Number of valid entries found */
 
     struct device_entry devices[MAX_DEVICES];
-    uint32_t device_count;
+    uint32_t device_count ;   // it works more like a index rather than size , for size do device_count+1 
 
 
      };
