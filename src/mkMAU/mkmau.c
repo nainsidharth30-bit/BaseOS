@@ -2,20 +2,24 @@
 #include "../../include/driverHeaders/uart.h"
 #include "../../include/mkMAU/mkMAU.h"
 #include "../../include/lib/dbt.h"
- #include "../../include/mkMAU/mobilemkMAU.h"
- #include "../../include/mkMAU/mkmau_utils.h"
- #include"stddef.h"
- #define MMAU_SIZE 4096
+#include "../../include/mkMAU/mobilemkMAU.h"
+#include "../../include/mkMAU/mkmau_utils.h"
+#include "../../include/driverHeaders/track_stack.h"
+
+#include"stddef.h"
+#define MMAU_SIZE 4096
 
  struct mkmau_node *memory_tracker_array = NULL;
  int memory_tracker_array_size ;
 
  extern  void array_node_shift_end (struct mkmau_node* memory_tracker_array , size_t shift_units , size_t from_which_node ,size_t array_size );
- int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array  );
- void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_end_address , struct hardware_info *out_info , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address ) ;
+ int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array ,uintptr_t end_range_tracker_array  );
+ void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_end_address ,uint32_t merge_array_count , struct reserved_region *merged_array , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address, struct hardware_info *out_info ) ;
+   uint32_t check_that_range_with_kernel (uintptr_t start_address , uintptr_t end_address , uintptr_t needed_size_for_array , uintptr_t kernel_start , uintptr_t kernel_end ,uintptr_t * free_range_end_address , uintptr_t* free_range_start_address);
 
 void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)  
 {
+    uart_puts("I am in mkmau_main");
        extern char _kernel_start[];
     extern char _kernel_end[];     
     
@@ -33,23 +37,28 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
        uintptr_t free_range_end_address ;
 
     
-       size_t jk = 0;
-       while(jk<out_info->rsv_count)
-       {
+//        size_t jk = 0;
+//        while(jk<out_info->rsv_count)
+//        {
           
-          uart_puts(" \n  Here is a reserved region \n");
-          /* To print the start address of the reserved region */
-uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
-    uart_puts(" ------");
-/* To print the end address of the reserved region */
-uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
+//           uart_puts(" \n  Here is a reserved region \n");
+//           /* To print the start address of the reserved region */
+// uart_puthex((uintptr_t)out_info->rsv_regions[jk].start);
+//     uart_puts(" ------");
+// /* To print the end address of the reserved region */
+// uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
 
-        jk++;
-       }
+//         jk++;
+//        }
+
+       struct reserved_region merged_array[(out_info->rsv_count)] ;
+       uart_puts("hello");
+       track_stack();
+    uint32_t merge_array_count =    mkmau_merge_array_rsv_regions(out_info,merged_array);
+    uart_puthex(merge_array_count);
 
 
-
-      mkMAU_find_free_range_for_range_nodes_array(kernel_start,out_info,total_number_of_possible_nodes,&free_range_start_address,&free_range_end_address);
+      mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,total_number_of_possible_nodes,&free_range_start_address,&free_range_end_address,out_info);
 
 
 //       uart_puts("Start address ------->");
@@ -58,239 +67,288 @@ uart_puthex((uintptr_t)out_info->rsv_regions[jk].end);
 //       uart_puthex(free_range_end_address);
       
 
-       memory_tracker_array = (struct mkmau_node*)free_range_start_address ;
-   memory_tracker_array_size =      mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array);
+       memory_tracker_array = (struct mkmau_node*)free_range_start_address;
+       uart_puts("\n Free range start address printing==");
+       uart_puthex(free_range_start_address);
+       uart_puts("\n Free range end address ==  ");
+       uart_puthex(free_range_end_address);
+       uart_puts("\n Hello Shinchan  1");
+   memory_tracker_array_size = mkMAU_initial_tracker_array_populating(kernel_end,out_info,memory_tracker_array,free_range_end_address);
 
-   uart_puts("\n---------------- ------->\n");
-     uart_puthex(memory_tracker_array_size);
-      uart_puts("\n---------------- ------->\n");
+//    int k =0 ;
+//    while(k<memory_tracker_array_size)
+//    {
+//     uart_puts("\n start=== ");
+//     uart_puthex(memory_tracker_array[k].base_range);
+//     uart_puts("\n end=== ");
+//     uart_puthex(memory_tracker_array[k].end_range);
+//     uart_puts("\n ");
+//     k++;
+//    }
+
+//    uart_puts("\n---------------- ------->\n");
+//      uart_puthex(memory_tracker_array_size);
+//       uart_puts("\n---------------- ------->\n");
 
 }
 
-void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address , struct hardware_info *out_info , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address  )
+void mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address ,uint32_t merge_array_count , struct reserved_region *merged_array , uintptr_t number_of_maximum_nodes ,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address , struct hardware_info *out_info  )
 {
        uintptr_t start_address = out_info->ram_base_address;
-   extern char _kernel_end[];     
-       uintptr_t end_address;
+   extern char _kernel_end[];
+   uintptr_t kernel_end_address = (uintptr_t)_kernel_end ;
+      uintptr_t  end_address ;
              size_t node_size = sizeof(struct mkmau_node);
        uintptr_t needed_size_for_array = node_size*number_of_maximum_nodes ;
-       if(out_info->rsv_regions[0].start<kernel_start_address)
+       
+       uint32_t iterator = 0 ;
+       
+       while(iterator<=merge_array_count)
        {
-          end_address = out_info->rsv_regions[0].start ;
-       }
-       else
-       {
-        end_address = kernel_start_address ;
-         if(end_address-start_address>=needed_size_for_array)
-         {
-                              *free_range_start_address=start_address;
-                  *free_range_end_address   = start_address + needed_size_for_array;
-                  return ;
-         }
-         else
-         {
-            start_address = (uintptr_t)_kernel_end  ;
-            end_address = out_info->rsv_regions[0].start ; 
-         }
-       }
-       uart_puts("--> start address of first reserved region \n");
-       uart_puthex((uintptr_t)end_address);
-        uart_puthex((uintptr_t)start_address);
-
-    size_t i =0 ;
-       while(1)
-       {
-
-            uintptr_t difference_result = end_address-start_address;
-            if(difference_result>=needed_size_for_array)
+        end_address = merged_array[iterator].start ;
+          if(start_address<=merged_array[iterator].start)
+          {
+            if(start_address==merged_array[iterator].start)
             {
-                  *free_range_start_address=start_address;
-                  *free_range_end_address   = start_address + needed_size_for_array;
-                  break;
+                start_address=merged_array[iterator].end;
+                iterator++;
+                continue;
             }
-            start_address = out_info->rsv_regions[i].end ;
-            end_address= out_info->rsv_regions[i+1].start;
-            i++;
+              
+
+      uint32_t correct_region_flag =  check_that_range_with_kernel(start_address , end_address , needed_size_for_array ,kernel_start_address,kernel_end_address,free_range_end_address,free_range_start_address);
+
+      if(correct_region_flag)
+      {
+        break;
+      }
+
+      start_address = merged_array[iterator].end ;
+      
+
+          }
+ 
+          iterator++ ;
 
        }
+
+       start_address =merged_array[merge_array_count-1].end ;
+       end_address=out_info->ram_base_address+out_info->ram_size ;
+       
+
+              check_that_range_with_kernel(start_address , end_address , needed_size_for_array ,kernel_start_address,kernel_end_address,free_range_end_address,free_range_start_address);
+
+              uart_puts("\n I am printing the range where our memory_tracker array is resides \n");
+              uart_puthex(*free_range_start_address);
+              uart_puts("\n \n");
+              uart_puthex(*free_range_end_address);
+                uart_puts("\n needed size for array  \n");
+                uart_puthex(needed_size_for_array);
+              
+ 
 }
 
- int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array )
- {     size_t tracker_array_size = 0;
-          extern char _kernel_start[];
-       uart_puts("we are in \n");
-       uart_puts("below is ram base address from dtb \n");
-       uart_puthex(out_info->ram_base_address);
-       uart_puts("\nbelow is ram size from dtb \n");
-       uart_puthex(out_info->ram_size);
-       uart_puts("\n below is kernel end address \n");
-       uart_puthex(kernel_end_address);
-        uart_puts("\n below is kernel start address \n");
-       uart_puthex((uintptr_t)_kernel_start);
 
-       struct mkmau_node range_node ;
-       range_node.base_range=kernel_end_address;
-      
-       range_node.end_range= (uint64_t)out_info->ram_base_address + (uint64_t)out_info->ram_size;
-       uart_puts("base address in starting--->");
-       uart_puthex(range_node.base_range);
-       uart_puts("\n");
-           uart_puts("end address in starting--->");
-       uart_puthex(range_node.end_range);
-       uart_puts("\n");
+  uint32_t check_that_range_with_kernel (uintptr_t start_address , uintptr_t end_address , uintptr_t needed_size_for_array , uintptr_t kernel_start , uintptr_t kernel_end ,uintptr_t * free_range_end_address , uintptr_t* free_range_start_address)
+  {
+         if(end_address-start_address>=needed_size_for_array)
+         {
 
+            if(end_address<kernel_start || start_address>kernel_end)
+            {
+                *free_range_start_address=start_address;
+                *free_range_end_address=start_address+needed_size_for_array ;
+                return 1 ;
+            }
 
-       memory_tracker_array[0] = range_node ;
-       tracker_array_size++; 
+               if(start_address<kernel_start && kernel_end<end_address )
+               {
+                      if(kernel_start-start_address>=needed_size_for_array)
+                      {
+                        * free_range_end_address=kernel_start;
+                        *free_range_start_address=start_address;
+                        return 1 ;
+                      } 
+                      else if(end_address-kernel_end>=needed_size_for_array)
+                       {
+                          *free_range_end_address=end_address;
+                          *free_range_start_address=kernel_end;
+                          return 1 ;
+                       }
+                       else {
+                        return 0;
+                       }
+               }
 
-      size_t i =0 ;
-             while(i<out_info->rsv_count)   // to keep track of resereved regions !
-             {
-              
-              uart_puts("In Outer While \n");
-           
-              size_t tracker_array_iterator = 0;
+           else if( kernel_start<start_address&&kernel_end>start_address&&kernel_end<end_address )
+            {
+                start_address = kernel_end ;
+            }
+           else if(start_address<kernel_start&&kernel_start<end_address&&kernel_end>end_address )
+            {
+                end_address=kernel_start;
+            }
+           else if(start_address==kernel_start && kernel_end<end_address)
+            {
+                start_address=kernel_end ;
+            }
+          else  if(start_address<kernel_start && kernel_end==end_address )
+            {
+                end_address=kernel_start ;
+            }
 
+            if(end_address-start_address>=needed_size_for_array)
+            {
+                *free_range_end_address = start_address+needed_size_for_array;
+                *free_range_start_address=start_address ;
+                return 1;
+            }
+         }
 
-                  while(tracker_array_iterator<tracker_array_size)
-                  {
+         return 0 ;
+  }
 
-                     uart_puts(" checking for resereved regions inside the tracker array \n      ");
-                       
-                     uint64_t start_address = memory_tracker_array[tracker_array_iterator].base_range;
-                     uint64_t end_address = memory_tracker_array[tracker_array_iterator].end_range;
+ int mkMAU_initial_tracker_array_populating(uintptr_t kernel_end_address , struct hardware_info *out_info , struct mkmau_node* memory_tracker_array ,uintptr_t end_range_tracker_array  )
+ {    uart_puts("\n Hello Shinchan");
+  uart_puts("\n I am printing memory_tracker_array==");
+  uart_puthex((uintptr_t)memory_tracker_array);
+    int tracker_array_size= -1 ;
+    extern char _kernel_start[];
+    uintptr_t kernel_start_address = (uintptr_t)_kernel_start;
+    struct reserved_region merged_array[out_info->rsv_count] ;
+    uint32_t merged_array_size = mkmau_merge_array_rsv_regions(out_info,merged_array);
 
-                        if(start_address==out_info->rsv_regions[i].start && end_address==out_info->rsv_regions[i].end)
-                        {
-                            uart_puts("\n I am in both side boundaries \n");
-                            tracker_array_iterator++;
-                           continue;
-                        }
+    int iterator = 0 ;
+             uintptr_t start_address = out_info->ram_base_address;
+         uintptr_t end_address ;
 
+         uart_puts(" \n Size tracker_array_size==");
+         uart_puthex(tracker_array_size);
 
-                     if(start_address<=out_info->rsv_regions[i].start && end_address>=out_info->rsv_regions[i].end)
-                     {    
-                            uart_puts("condition true  \n ");
-                            uint64_t first_range_address_start  = start_address;
-                            uint64_t first_range_address_end = out_info->rsv_regions[i].start;
- 
-                         
-                           
-                            struct mkmau_node node_1 ;
-  
+    while(iterator<=merged_array_size)
+    {
 
-                            if(end_address==out_info->rsv_regions[i].end || start_address==out_info->rsv_regions[i].start)
-                            {
-                                   uart_puts("chachacha \n");
-                                    if(end_address==out_info->rsv_regions[i].end)
-                                    {
-                                          node_1.base_range=start_address;
-                                          node_1.end_range=out_info->rsv_regions[i].start;
+        end_address=merged_array[iterator].start ;
 
-                                    }
-                                    else
-                                    {
-                                         node_1.base_range=out_info->rsv_regions[i].end;
-                                         node_1.end_range=end_address;
+        if(end_address==start_address)
+        {
+            uart_puts("\n start=end");
+        }
 
-                                    }
-                                memory_tracker_array[tracker_array_iterator]=node_1;
-                                             for(size_t j=0 ; j<tracker_array_size;j++)
-             {
-              uart_puts(" start-->  ");
-              uart_puthex(memory_tracker_array[j].base_range);
-                  uart_puts(" end-->  ");
-              uart_puthex(memory_tracker_array[j].end_range);
-             }
-                                          break;
-
-                            }
-
-                             node_1.base_range=first_range_address_start;
-                            node_1.end_range=first_range_address_end;
-                            
-                             uint64_t second_range_address_start = out_info->rsv_regions[i].end;
-                            uint64_t second_range_address_end=end_address;
-
-                            struct mkmau_node node_2 ;
-                            node_2.base_range=second_range_address_start;
-                            node_2.end_range=second_range_address_end;
-   
-
-                           array_node_shift_end(memory_tracker_array,1,tracker_array_iterator,tracker_array_size);
-
-                           memory_tracker_array[tracker_array_iterator]=node_1;
-                           memory_tracker_array[tracker_array_iterator+1]=node_2;
-                           tracker_array_size++;
-                                        for(size_t j=0 ; j<tracker_array_size;j++)
-             {
-              uart_puts(" start-->  ");
-              uart_puthex(memory_tracker_array[j].base_range);
-                  uart_puts(" end-->  ");
-              uart_puthex(memory_tracker_array[j].end_range);
-             }
-                           uart_puts("full h \n");
-                           
-                     }
-
-                     if(start_address<out_info->rsv_regions[i].start && end_address<out_info->rsv_regions[i].end && end_address>out_info->rsv_regions[i].start || 
-                         start_address>out_info->rsv_regions[i].start&&end_address>out_info->rsv_regions[i].end&&start_address<out_info->rsv_regions[i].end)
-                         {
-                            uart_puts("I am checking overllaping    ");
-                               struct mkmau_node node ; 
-                              if(start_address<out_info->rsv_regions[i].start)
-                              {
-                                   
-                                   node.base_range=start_address;
-                                   node.end_range=out_info->rsv_regions[i].start;
-                              }
-                              else
-                              {
-                                   
-                                   node.base_range = out_info->rsv_regions[i].end;
-                                   node.end_range=end_address;
-                            }
-                            memory_tracker_array[tracker_array_iterator]=node;
-                                         for(size_t j=0 ; j<tracker_array_size;j++)
-             {
-              uart_puts(" start-->  ");
-              uart_puthex(memory_tracker_array[j].base_range);
-                  uart_puts(" end-->  ");
-              uart_puthex(memory_tracker_array[j].end_range);
-             }
-                            break;
-
-                         }
-  
-
-                     tracker_array_iterator++ ;
-
-                  }
-
-                 
-                 
-                 
-                i++;
-             }
-
-             for(size_t j=0 ; j<tracker_array_size;j++)
-             {
-                uintptr_t array_start = (uintptr_t)memory_tracker_array;
-    uintptr_t array_end = (uintptr_t)(memory_tracker_array + tracker_array_size);
-              uart_puts(" start-->  ");
-              uart_puthex(memory_tracker_array[j].base_range);
-                  uart_puts(" end-->  ");
-              uart_puthex(memory_tracker_array[j].end_range);
-              if(memory_tracker_array[j].base_range < array_end && memory_tracker_array[j].end_range > array_start)
+        if(end_address>start_address)
+        {
+             uart_puts("\n end>start");
+              if(kernel_start_address==start_address&&kernel_end_address==end_address)
               {
-                   uart_puts("  \n?????????\n ");
-                   uart_puts("True");
-                   uart_puts("  \n?????????\n ");
+                iterator++;
+                continue;
+              } 
+              else if(kernel_start_address==start_address&&kernel_end_address<end_address)
+              { uart_puts("\n I was right ");
+                 uart_puthex(tracker_array_size);
+                tracker_array_size++;
+                         uart_puts(" \n Size tracker_array_size==");
+         uart_puthex(tracker_array_size);
+                 struct mkmau_node node ;
+                 node.base_range= kernel_end_address;
+                 node.end_range=end_address;
+                memory_tracker_array[tracker_array_size].base_range = kernel_end_address;
+    memory_tracker_array[tracker_array_size].end_range  = end_address;
+                         uart_puts(" \n Size tracker_array_size==");
+         uart_puthex(tracker_array_size);
+              } 
+              else if(kernel_end_address==end_address&&kernel_start_address>start_address)
+              {
+                 tracker_array_size++;
+                 struct mkmau_node node ;
+                 node.base_range=start_address;
+                 node.end_range=kernel_start_address;
+                 memory_tracker_array[tracker_array_size]=node;
+              }
+              else if(start_address<kernel_start_address&&end_address>kernel_end_address){
+                struct mkmau_node node_1;
+                struct mkmau_node node_2 ;
+
+                node_1.base_range=start_address;
+                node_1.end_range=kernel_start_address;
+                tracker_array_size++;
+                memory_tracker_array[tracker_array_size]=node_1;
+                node_2.base_range=kernel_end_address;
+                node_2.end_range=end_address;
+               tracker_array_size++;
+                memory_tracker_array[tracker_array_size]=node_2;
+              }
+              else
+              {
+                uart_puts("\n We founf a totally free region \n");
+                struct mkmau_node node ;
+                uart_puts("\nssssss===");
+                uart_puthex(start_address);
+                uart_puts("\neeeee===");
+                uart_puthex(end_address);
+                node.base_range=start_address;
+                node.end_range=end_address;
+                tracker_array_size++;
+   memory_tracker_array[tracker_array_size].base_range = node.base_range;
+    memory_tracker_array[tracker_array_size].end_range  = node.end_range;
               }
 
-             }
-             uart_puts("  Itd done ");
-             return tracker_array_size;
+        }
+        start_address=merged_array[iterator].end;
+
+        iterator++;
+    }
+
+
+
+    
+   int i =0 ;
+   while(i<=tracker_array_size)
+   {
+      if(memory_tracker_array[i].base_range==(uintptr_t)memory_tracker_array && memory_tracker_array[i].end_range==end_range_tracker_array)
+      {
+        array_node_shift_end(memory_tracker_array,1,i-1,tracker_array_size);
+        tracker_array_size--;
+        break;
+      }
+      else if(memory_tracker_array[i].base_range==(uintptr_t)memory_tracker_array && memory_tracker_array[i].end_range>end_range_tracker_array)
+      {
+            memory_tracker_array[i].base_range=end_range_tracker_array;  
+            break;
+      }
+      else if(memory_tracker_array[i].end_range==end_range_tracker_array && memory_tracker_array[i].base_range<(uintptr_t)memory_tracker_array)
+      {
+         memory_tracker_array[i].end_range=(uintptr_t)memory_tracker_array;
+         break;
+      }
+      else if (memory_tracker_array[i].base_range<(uintptr_t)memory_tracker_array && memory_tracker_array[i].end_range>end_range_tracker_array)
+      {
+           
+            tracker_array_size++;
+            memory_tracker_array[tracker_array_size].base_range=end_range_tracker_array;
+            memory_tracker_array[tracker_array_size].end_range=memory_tracker_array[i].end_range ;
+
+             memory_tracker_array[i].end_range=(uintptr_t)memory_tracker_array;
+             break;
+      }
+    i++;
+   }
+
+
+   int j = 0;
+while (j <= tracker_array_size)
+{
+    uart_puts("\n Free region start --> ");
+    uart_puthex(memory_tracker_array[j].base_range);
+    uart_puts("\n  end --> ");
+    uart_puthex(memory_tracker_array[j].end_range);
+    uart_puts(" \n  size --> ");
+    uart_puthex(memory_tracker_array[j].end_range - memory_tracker_array[j].base_range);
+    j++;
+}
+
+
+     
 
 
  }
