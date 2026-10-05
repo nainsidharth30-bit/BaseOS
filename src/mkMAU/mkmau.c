@@ -5,6 +5,7 @@
 #include "../../include/mkMAU/mobilemkMAU.h"
 #include "../../include/mkMAU/mkmau_utils.h"
 #include "../../include/driverHeaders/track_stack.h"
+#include "../../include/driverHeaders/find_ssd_device.h"
 
 #include"stddef.h"
 #define MMAU_SIZE 4096
@@ -89,6 +90,8 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 //    uart_puts("\n---------------- ------->\n");
 //      uart_puthex(memory_tracker_array_size);
 //       uart_puts("\n---------------- ------->\n");
+
+discover_ssd_device(out_info);
 
 }
 

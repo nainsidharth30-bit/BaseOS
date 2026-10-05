@@ -5,8 +5,15 @@
 
 struct hardware_info g_hw = {0} ;
 
+   int (*ssd_driver)(uintptr_t sector_address , uintptr_t buffer_base , uintptr_t buffer_size , uintptr_t mmio_base , uintptr_t mmio_size)=0;
+
 void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
 { 
+
+  uart_puts("\n\nZZZ_UNIQUE_MARKER_12345\n\n");
+
+  uart_puts("\n\n");   
+  uart_puts("\n I am in main 1  \n");
       
     extern char _kernel_start[];
     extern char _kernel_end[]; 
@@ -22,11 +29,21 @@ void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
     // uart_puthex(kernel_end);
     // uart_puts("\n");
 
+  uart_puts("\n I am in main 2\n");
+
 
    
   // uart_puts(" \n We are extracting DBT Information now \n");
   
       extracting_dbt_info(x0_register  , &g_hw) ; 
+
+
+uart_puts("\nI am outsiude dtb \n");
+
+
+
+
+
   //  uart_puts("\n  Extracted Information   \n");
   //   uart_puts("\n RAM BASE ADDRESS ==  ");
   //   uart_puthex(g_hw.ram_base_address);

@@ -494,10 +494,21 @@ void extract_ram_info(uint8_t *base_address, size_t len_to_read,uint32_t address
 
                     out_info->ram_base_address = ram_base;
                      out_info->ram_size = ram_size;
+
+
+                     
+          uart_puts("\n Hello , I am in main , giving you Ram Basew and Ram size\n");
+    uart_puthex(out_info->ram_base_address);
+    uart_puts("\n");
+    uart_puthex(out_info->ram_size);
+    uart_puts("\n");
 }
 
 void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char* compatibility)
 {    
+
+  uart_puts("\n Hello , I am in SSD DTB \n");
+  
 
 
       uint64_t mmio_base = 0;
@@ -547,23 +558,35 @@ void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_addres
 
          
 
-
-                    device_node->mmio_base_address = mmio_base;
-                     device_node->mmio_size = mmio_size;
+                        out_info->devices[out_info->device_count].mmio_base_address=mmio_base;
+                      out_info->devices[out_info->device_count].mmio_size=mmio_size;
+                 
 
                      int i=0;
+                     uart_puts("\n  SSD COMPATIBLE  \n ");
                      while(compatibility[i]!='\0')
                      {
-                      device_node->compatible[i]=compatibility[i];
+                      uart_putc(compatibility[i]);
+                    out_info->devices[out_info->device_count].compatible[i]=compatibility[i];
                       i++;
                      }
-                     device_node->compatible[i]='\0';
+                     uart_puts("\n");
+                     out_info->devices[out_info->device_count].compatible[i]='\0';
+
+                     uart_puts("\n  SSD MMIO BASE\n ");
+                     uart_puthex(mmio_base);
+                     uart_puts("\nSSD MMIO SIZE\n ");
+                     uart_puthex(mmio_size);
+
+                  out_info->device_count++;
+
+                      
+                     
   
 
-            
-                     
-                  
 
+               
+                       
 }
 
 void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info , struct device_entry* device_node)
