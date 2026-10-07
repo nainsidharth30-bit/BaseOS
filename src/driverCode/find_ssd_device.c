@@ -7,7 +7,8 @@
 #include<string.h>
 
 
-void discover_ssd_device(struct hardware_info* out_info) ;
+// void discover_ssd_device(struct hardware_info* out_info) ;
+void dump_hex() ;
 
 
 void discover_ssd_device(struct hardware_info* out_info)
@@ -78,15 +79,54 @@ while(devices_array_iterator<out_info->device_count)
 }
 
 
-// Now Doing Binding ! 
+// Now Doing Binding !   Index tells the index number where our ssd device is present inside the devices array ! 
 
   if(str_eq(ssd_compatibles[index],"virtio,mmio"))
   {
        ssd_driver = virtio_ssd_driver ;
   }
 
-  ssd_driver(1,2,3,4,5);
+  struct ssd_request_bpt bpt = {0};
+  bpt.mmio_base=out_info->devices[index].mmio_base_address;
+  bpt.mmio_size=out_info->devices[index].mmio_size;
+  bpt.queue_base=0x000000004140A000;
+  bpt.queue_size=256*26 ;
+  bpt.ram_buffer_address = 0x0000000042B83EA0 ;
+  bpt.sector_address = 1024 ;
+  
 
+   ssd_driver(&bpt);
+
+
+
+
+
+  dump_hex();
+  
+
+
+
+
+}
+
+   void dump_hex(){
+    const uint8_t *p = (const uint8_t *)0x42B83EA0;
+    for (uint32_t i = 0; i < 512; i++) {
+        if ((i % 16) == 0) {
+            uart_puts("\n");
+            uart_puthex(0x41FF + i);
+            uart_puts(": ");
+        }
+        uint8_t b = p[i];
+        /* high nibble */
+        uart_putc("0123456789ABCDEF"[(b >> 4) & 0xF]);
+        /* low nibble */
+        uart_putc("0123456789ABCDEF"[b & 0xF]);
+        uart_putc(' ');
+
+        
+    }
+    uart_puts("\n");
 }
 
 

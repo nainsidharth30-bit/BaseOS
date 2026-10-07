@@ -6,7 +6,8 @@
 #include "../../include/driverHeaders/uart.h"
 #include "../../include/lib/alignbyte.h"
 #include "../../include/driverHeaders/track_stack.h"
-
+#include "../../include/driverHeaders/queue_address.h"
+#include "../../include/lib/compare_start_address.h"
 
 
 #define FDT_BEGIN_NODE  0x00000001
@@ -25,15 +26,7 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells , struct hardware_info* out_info);
 void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char* compatibility);
 
-int compare_start_address(const void *a, const void *b)
-{
-    const struct mkmau_node *node_a = (const struct mkmau_node *)a;
-    const struct mkmau_node *node_b = (const struct mkmau_node *)b;
 
-    if (node_a->base_range < node_b->base_range) return -1;
-    if (node_a->base_range > node_b->base_range) return 1;
-    return 0;
-}
 
 
 int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info )
@@ -580,7 +573,7 @@ void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_addres
 
                   out_info->device_count++;
 
-                      
+                    extract_virtio_queue_address(mmio_base,mmio_size);  
                      
   
 
@@ -659,3 +652,6 @@ void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_t
      }
 
 }
+
+
+// The devices array Population Problem is ignored for some Time !  

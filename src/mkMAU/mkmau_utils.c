@@ -2,7 +2,10 @@
 #include<stddef.h>
 #include<stdint.h>
 #include "../../include/driverHeaders/uart.h"
-uint32_t mkmau_merge_array_rsv_regions(struct hardware_info* out_info , struct reserved_region* merged_array ) ;
+
+uint32_t mkmau_merge_array_rsv_regions(struct reserved_region temporary_array[] ,
+                                       int temporary_array_size ,
+                                       struct reserved_region merged_array[] ) ;
 extern void array_node_shift_end(struct mkmau_node* memory_tracker_array, size_t shift_units, size_t from_which_node, size_t array_size);
  struct mkmau_node break_the_block_update_memory_tracker_array(int iterator  , uintptr_t bytes_to_allocate , int* tracker_array_size) ;
 
@@ -80,132 +83,46 @@ struct mkmau_node memory_allocator(uintptr_t bytes_to_allocate)
     }
 }
 
-
-uint32_t mkmau_merge_array_rsv_regions(struct hardware_info* out_info , struct reserved_region merged_array[] )
+/* 
+This function tries to merged those resevred regions which are either partially overlapping , or are adjacent to each other or are fully embeddeed inside each other ! 
+*/uint32_t mkmau_merge_array_rsv_regions(struct reserved_region temporary_array[] ,
+                                       int temporary_array_size ,
+                                       struct reserved_region merged_array[])
 {
         uint32_t iterator = 0 ;
-        uint32_t merged_array_count = -1 ;
+        uint32_t merged_array_count = 0 ;
 
-    // uart_puts("I am alive");
-
-        while(iterator<out_info->rsv_count-1)
+        if(temporary_array_size == 0)
         {
-                //  uart_puthex(iterator);
-                //  uart_puts("\n");
-            struct reserved_region node_1 = out_info->rsv_regions[iterator] ;
-            struct reserved_region node_2 = out_info->rsv_regions[iterator+1];
-
-
-            //   if(merged_array_count!=-1)
-            //   {
-            //     uart_puts("ifififif");
-            //     if( node_1.end < merged_array[merged_array_count].end || node_1.start>merged_array[merged_array_count].start)
-            //     {
-            //         // if(node_1.end < merged_array[merged_array_count].end && node_1.start>merged_array[merged_array_count].start)
-            //         // {
-            //         //     iterator++;
-            //         //     continue;
-            //         // }
-            //         uart_puts("\n Hello I am here , ket see \n");
-                   
-            //         struct reserved_region another_node ;
-            //         if(node_1.end < merged_array[merged_array_count].end&&node_1.start<=merged_array[merged_array_count].start)
-            //         {    uart_puts("\n FFFFFFFFFF \n");
-            //              another_node.start=node_1.start;
-            //              another_node.end=merged_array[merged_array_count].end;
-            //         }
-
-            //         if(node_1.start>merged_array[merged_array_count].start&&node_1.end<=merged_array[merged_array_count].end)
-            //         {   uart_puts("\n GGGGGGGGGG \n");
-            //              another_node.start=merged_array[merged_array_count].start;
-            //              another_node.end = node_1.end ;
-            //         }
-
-                  
-            //         merged_array[merged_array_count]=another_node;
-                   
-                    
-
-
-            //     }
-            //   }
-
-
-            if(node_1.end<=node_2.start)  // if regions are placed adjacent or with some gap 
-            //
-             {    
-                // uart_puts("I am pushing something in array");
-                 merged_array_count++;
-                //  uart_puthex(merged_array_count);
-                 merged_array[merged_array_count]=node_1 ;
-                //  uart_puts("Done");
-            }
-            else if(node_1.start<node_2.start&&node_1.end<node_2.end)
-            // 
-            {   
-            //  uart_puts("I am pushimergen array");
-                struct reserved_region another_node ;
-                another_node.end=node_2.end ;
-                another_node.start=node_1.start ;
-                merged_array_count++;
-                 merged_array[merged_array_count]=another_node ;
-               iterator++ ;
-            }
-            else{
-                //  uart_puts("I amyahoooooooooray");
-                merged_array_count++;
-                 merged_array[merged_array_count]=node_1 ;
-                 iterator++;
-            }
-            // uart_puts("Incrementing");
-           iterator++;  
+                return 0 ;
         }
 
+        /* Seed the output with the first region */
+        merged_array[0] = temporary_array[0] ;
 
+        for(iterator = 1 ; iterator < temporary_array_size ; iterator++)
+        {
+                struct reserved_region node = temporary_array[iterator] ;
+                struct reserved_region* last = &merged_array[merged_array_count] ;
 
+                /* If node starts at or before the end of the last merged region,
+                   they overlap or are adjacent — extend the merged region. */
+                if(node.start <= last->end)
+                {
+                        if(node.end > last->end)
+                        {
+                                last->end = node.end ;
+                        }
+                }
+                else
+                {
+                        /* Real gap — start a new merged region */
+                        merged_array_count++ ;
+                        merged_array[merged_array_count] = node ;
+                }
+        }
 
-        // Handling the last region 
-
-
-          // checking if last region is already merged or not 
-
-       if (out_info->rsv_regions[out_info->rsv_count - 1].start <= merged_array[merged_array_count].end &&
-    out_info->rsv_regions[out_info->rsv_count - 1].end >= merged_array[merged_array_count].start)
-{
-    // Overlap. Extend the merged region if the last region goes further.
-    if (out_info->rsv_regions[out_info->rsv_count - 1].end > merged_array[merged_array_count].end)
-    {
-        merged_array[merged_array_count].end = out_info->rsv_regions[out_info->rsv_count - 1].end;
-    }
-}
-else
-{
-    merged_array_count++;
-    merged_array[merged_array_count] = out_info->rsv_regions[out_info->rsv_count - 1];
-}
-
-
-// int i=0 ;
-// while(i<=merged_array_count)
-// {
-    
-//     uart_puts("start = ");
-// uart_puthex(merged_array[i].start);
-// uart_puts("  end = ");
-// uart_puthex(merged_array[i].end);
-// uart_puts("\n");
-//     i++ ;
-// }
-
-
-
-
-
-
-
-
-return merged_array_count ;
-
+        return merged_array_count ;
 }
 
     

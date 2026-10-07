@@ -2,10 +2,18 @@
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
 #include "../../include/mkMAU/mkMAU.h"
+#include "../../include/driverHeaders/generic_struct_ssd.h"
 
 struct hardware_info g_hw = {0} ;
 
-   int (*ssd_driver)(uintptr_t sector_address , uintptr_t buffer_base , uintptr_t buffer_size , uintptr_t mmio_base , uintptr_t mmio_size)=0;
+ uint32_t max_queue_size = -1 ; 
+
+ uintptr_t ssd_queue_address = 0 ;
+ 
+ void * kernel_buffer_address = 0 ;
+ uint32_t ssd_sector_size = 0 ;
+
+   int (*ssd_driver)(struct ssd_request_bpt* bpt)=0;
 
 void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
 { 
