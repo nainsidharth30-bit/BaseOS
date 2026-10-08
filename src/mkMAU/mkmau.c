@@ -26,9 +26,6 @@
 
 
 
-
-
-
 void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)  
 {
     uart_puts("I am in mkmau_main");
@@ -51,7 +48,7 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
        uart_puts("\n size ssd sector size  \n");
    uart_puthex((uintptr_t)ssd_sector_size);
     uart_puts("\n \n");
-      uint64_t size_of_available_ram = out_info->ram_size - ((uint64_t)kernel_size+(size_of_reserved_regions)+(uint32_t)max_queue_size*26 + (uint32_t)ssd_sector_size); // we include kernel as reserved region but not the dtb tree region 
+      uint64_t size_of_available_ram = out_info->ram_size - ((uint64_t)kernel_size+(size_of_reserved_regions)+(uint32_t)max_queue_size*26 + (uint32_t)ssd_sector_size);
    uart_puts("\n size of free memory \n");
    uart_puthex((uintptr_t)size_of_available_ram);
     uart_puts("\n \n");
@@ -73,11 +70,13 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
     
  // merged_array is an array used for all inuse memory which either is reserved region and kernel occupied spaces ! 
 
-       struct reserved_region merged_array[(out_info->rsv_count+1+1+1)] ; // we are adding kernel buffer , ssd queue and kernel itself also ! 
+       struct reserved_region merged_array[(out_info->rsv_count+1+1+1)] ;
         
 
 
        uart_puts("hello");
+
+       int temp=0 ;
 
        track_stack();
 
@@ -97,20 +96,28 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 
        array_sort(temporaray_array,sizeof(struct reserved_region),out_info->rsv_count+1,compare_start_address);
 
-
+  
 
     uint32_t merge_array_count =    mkmau_merge_array_rsv_regions(temporaray_array,out_info->rsv_count+1,merged_array);
     uart_puthex(merge_array_count);
 
+    /* ---- Print step 1: Kernel inserted ---- */
+    temp=merge_array_count;
+      uart_puts("\n Kernel  inserted !  \n");
+            while(temp!=-1)
+          {
+            uart_puts("\n Region Start = ");
+             uart_puthex(merged_array[temp].start);
+            uart_puts("\n Region End = ");
+             uart_puthex(merged_array[temp].end);
+            temp--;
+          }
 
+
+  /* ---- Reserve tracker, then sort+merge, THEN print ---- */
   merge_array_count =  mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,total_number_of_possible_nodes*sizeof(struct mkmau_node),&free_range_start_address,&free_range_end_address,out_info,0);
 
-
-    
-
        memory_tracker_array = (struct mkmau_node*)free_range_start_address;
-
-
 
        array_sort(merged_array,sizeof(struct reserved_region),merge_array_count+1,compare_start_address);
        int j =0 ;
@@ -123,7 +130,20 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 
        merge_array_count = mkmau_merge_array_rsv_regions(temporaray_array,merge_array_count+1,merged_array);
 
-       merge_array_count = mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,ssd_sector_size+4,&free_range_start_address
+    temp=merge_array_count;
+                uart_puts("\n memory_tracker_array inserted !  \n");
+            while(temp!=-1)
+          {
+            uart_puts("\n Region start = ");
+             uart_puthex(merged_array[temp].start);
+            uart_puts("\n Region end = ");
+             uart_puthex(merged_array[temp].end);
+            temp--;
+          }
+
+
+  /* ---- Reserve kernel buffer, then sort+merge, THEN print ---- */
+  merge_array_count = mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,ssd_sector_size+4,&free_range_start_address
       ,&free_range_end_address,out_info,0);
 
             extern void * kernel_buffer_address ;
@@ -143,52 +163,50 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 
         merge_array_count = mkmau_merge_array_rsv_regions(temporaray_array,merge_array_count+1,merged_array);
 
+      temp=merge_array_count;
+                      uart_puts("\n Kernel Buffer inserted !  \n");
+            while(temp!=-1)
+          {
+            uart_puts("\n Region start = ");
+             uart_puthex(merged_array[temp].start);
+            uart_puts("\n Region end = ");
+             uart_puthex(merged_array[temp].end);
+            temp--;
+          }
 
-          merge_array_count = mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,max_queue_size,&free_range_start_address
+
+  /* ---- Reserve SSD queue, then sort+merge, THEN print ---- */
+  merge_array_count = mkMAU_find_free_range_for_range_nodes_array(kernel_start,merge_array_count,merged_array,max_queue_size,&free_range_start_address
       ,&free_range_end_address,out_info,1);
 
       extern uintptr_t ssd_queue_address ;
       ssd_queue_address = free_range_start_address ;
-
-      
-             uart_puts("\n queue address start==");
-       uart_puthex(free_range_start_address);
-       uart_puts("\n queue address end ==  ");
-       uart_puthex(free_range_end_address);
-       uart_puts("\n Hello Shinchan  1");
-
-
-         
-
-
-
-
-
-
-
-
-
-
-   //          while(merge_array_count!=-1)
-   //  {
-   //    uart_puts("\n  Region Start");
-   //    uart_puthex(merged_array[merge_array_count].start);
-   //    uart_puts("----- end address");
-   //     uart_puthex(merged_array[merge_array_count].end);
-   //     uart_puts("\n");
-   //     merge_array_count--;
-   //  }
-
-
-
-
-          
-
-
-discover_ssd_device(out_info);
-
+       array_sort(merged_array,sizeof(struct reserved_region),merge_array_count+1,compare_start_address);
      
+                    int k =0 ;
+       while(k<merge_array_count+1)
+       {
+         temporaray_array[k].start=merged_array[k].start ;
+         temporaray_array[k].end=merged_array[k].end ;
+         k++;
+       }
 
+          merge_array_count = mkmau_merge_array_rsv_regions(temporaray_array,merge_array_count+1,merged_array);
+
+      temp=merge_array_count;
+                      uart_puts("\n SSD QUEUE inserted !  \n");
+            while(temp!=-1)
+          {
+            uart_puts("\n Region start = ");
+             uart_puthex(merged_array[temp].start);
+            uart_puts("\n Region end = ");
+             uart_puthex(merged_array[temp].end);
+            temp--;
+          }
+
+      uart_puts("Hewllooo");
+
+      discover_ssd_device(out_info);
 }
 
  void array_node_shift_end (struct mkmau_node* memory_tracker_array , size_t shift_units , size_t from_which_node ,size_t array_size )
@@ -245,12 +263,15 @@ discover_ssd_device(out_info);
              if(end_address-start_address>=number_of_bytes)
              {
                *free_range_start_address = start_address ;
+  
                if( byte_align)
                {
+                             
                    byte_alignemnt_by_4096((void *)free_range_start_address);
 
                    if(*free_range_start_address+number_of_bytes<=end_address)
                    {
+                    
                                     *free_range_end_address=*free_range_start_address+ number_of_bytes;
                merge_array_count++;
                merged_array[merge_array_count].start= *free_range_start_address ;
@@ -258,7 +279,9 @@ discover_ssd_device(out_info);
                return merge_array_count;
                    }
                    else
-                   {  // write the corrrect start_address assignment here 
+                   {  
+                    
+                    // write the corrrect start_address assignment here 
                          start_address = merged_array[iterator].end;
                      iterator++;
                      continue;

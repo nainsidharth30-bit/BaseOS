@@ -1,8 +1,7 @@
-
 /*
  * Minimal virtio-mmio block driver for BaseOS: reads ONE 512-byte sector.
  * Handles both transport versions (1 = legacy, 2 = modern).
- * Polls for completion (no interrupts needed yet).
+ * Submits the request and returns immediately — no polling.
  *
  * Queue memory (given by the core in bpt->queue_base / queue_size):
  *   legacy: base must be 4096-aligned, at least LEG_NEED bytes
@@ -252,7 +251,7 @@ static int virtio_init(const struct ssd_request_bpt *b)
     return SSD_OK;
 }
 
-/* ---------- one read request ---------- */
+/* ---------- submit one read request (does not wait) ---------- */
 static int virtio_read_sector(const struct ssd_request_bpt *b)
 {
     /* 1. request header + status byte */
@@ -287,26 +286,6 @@ static int virtio_read_sector(const struct ssd_request_bpt *b)
     /* 4. ring the doorbell */
     wr(g_mmio, R_QUEUE_NOTIFY, 0);
 
-    /* 5. wait for the device to finish (poll the used ring) */
-    uint32_t spins = 50000000u;
-    while (g_used->idx == g_last_used) {
-        if (--spins == 0) {
-            LOG("virtio: timeout");
-            return SSD_ERR_TIMEOUT;
-        }
-    }
-    BARRIER();
-    g_last_used = (uint16_t)(g_last_used + 1u);
-
-    uint32_t is = rd(g_mmio, R_INT_STATUS);     /* clear the interrupt flag, harmless when polling */
-    if (is) wr(g_mmio, R_INT_ACK, is);
-
-    /* 6. check the answer */
-    uint8_t st = *g_status;
-    if (st != 0) {
-        LOGHEX("virtio: device status ", st);
-        return SSD_ERR_IO;
-    }
     return SSD_OK;
 }
 

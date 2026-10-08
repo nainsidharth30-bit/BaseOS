@@ -7,7 +7,10 @@
 #include "../../include/lib/alignbyte.h"
 #include "../../include/driverHeaders/track_stack.h"
 #include "../../include/driverHeaders/queue_address.h"
+#include "../../include/driverHeaders/device_indexes.h"
 #include "../../include/lib/compare_start_address.h"
+#include "../../include/string_utility.h"
+#include "../../include/lib/memcpy.h"
 
 
 #define FDT_BEGIN_NODE  0x00000001
@@ -17,16 +20,17 @@
 #define FDT_END         0x00000009
 
 void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_to_read , struct hardware_info* out_info,uint32_t address_cells ,uint32_t size_cells);
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info , struct device_entry* device_node);
-void extract_ssd_gic_phandle_data(uint8_t* base_address  , struct device_entry* device_node);
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info );
+void extract_ssd_gic_phandle_data(uint8_t* base_address );
  void traverse_totalsize (uintptr_t dbt_tree_ptr ,struct hardware_info *out_info);
 void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info *out_info);
   void discard_dbt(uintptr_t dbt_tree_ptr , uintptr_t dbt_size);
   void   traverse_off_mem_rsvmap(uintptr_t dbt_tree_ptr,struct hardware_info *out_info);
 void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells , struct hardware_info* out_info);
-void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char* compatibility);
+void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char* compatibility);
 
 
+   struct device_entry ssd_device_node ;
 
 
 int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info )
@@ -36,13 +40,19 @@ int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info 
             return -1 ;
          } 
 
+       
+
         
         traverse_off_mem_rsvmap(dbt_tree_ptr,out_info);
        dtb_structure_blocks_parser(dbt_tree_ptr,out_info);
         array_sort(out_info->rsv_regions , sizeof(struct reserved_region) ,out_info->rsv_count ,compare_start_address);
        traverse_totalsize(dbt_tree_ptr,out_info);
-     
 
+         if(ssd_device_node.mmio_size)
+         {
+           memcopy(&out_info->devices[SSD_DEVICE_INDEX ] , &ssd_device_node , sizeof(struct device_entry));
+           out_info->device_count++;
+         }
 
 }
 
@@ -129,8 +139,8 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
       uint8_t *one_byte_tracker_pointer = (uint8_t *)base_of_structure_block;
 
-      struct device_entry device_node ;
-      struct device_entry * device_node_ptr=&device_node;
+   
+      
 
               uint32_t address_cells = 2;
         uint32_t size_cells = 2; // we use default value 
@@ -191,6 +201,8 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
          uint8_t device_flag = 0;
          uint8_t compatible_flag =0;
 
+         uint8_t interrupt_controller_flag = 0 ; 
+
 
 
 
@@ -207,8 +219,13 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
              uint8_t * interrupt_parent_buffer = NULL;
              size_t interrupt_parent_len = 0;
 
+             
+
            
              char compatible_buffer[12] = "";
+
+             uint8_t* interrupt_controller_buffer = NULL;
+             size_t interrupt_buffer_len = 0 ;
              
 
 
@@ -237,6 +254,9 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
           irq_line_buffer=NULL;
           irq_line_len=0;
           compatible_buffer[0] = '\0'; 
+
+                  interrupt_controller_buffer = NULL;
+             interrupt_buffer_len = 0 ;
 
 
           depth++;
@@ -361,6 +381,12 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
 
 
 
+      if (prop_name[0]=='i' && prop_name[1]=='n' && prop_name[2]=='t' && prop_name[3]=='e' && prop_name[4]=='r' && prop_name[5]=='r' && prop_name[6]=='u' && prop_name[7]=='p' && prop_name[8]=='t' &&prop_name[9]=='-' && prop_name[10]=='c' && prop_name[11]=='o' &&prop_name[12]=='n' && prop_name[13]=='t' && prop_name[14]=='r' && prop_name[15]=='o' && prop_name[16]=='l' && prop_name[17]=='l' &&prop_name[18]=='e' && prop_name[19]=='r' && prop_name[20]=='\0')
+{
+    interrupt_controller_flag = 1;
+}
+
+
       
 
 
@@ -386,19 +412,19 @@ void dtb_structure_blocks_parser (uintptr_t dtb_tree_ptr , struct hardware_info 
       if(ssd_node_flag && reg_buffer)
       { 
         track_stack();
-        extract_ssd_mmio_size(device_node_ptr,reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
+        extract_ssd_mmio_size(reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
       }
 
       if(ssd_node_flag&&irq_line_buffer)
       {
        
-        extract_ssd_irq_line_data(irq_line_buffer,irq_line_len,interrupt_cells,out_info,device_node_ptr);
+        extract_ssd_irq_line_data(irq_line_buffer,irq_line_len,interrupt_cells,out_info);
       }
 
       if(ssd_node_flag&&interrupt_parent_buffer)
       {
         
-        extract_ssd_gic_phandle_data(interrupt_parent_buffer,device_node_ptr);
+        extract_ssd_gic_phandle_data(interrupt_parent_buffer);
       
       }
 
@@ -497,7 +523,7 @@ void extract_ram_info(uint8_t *base_address, size_t len_to_read,uint32_t address
     uart_puts("\n");
 }
 
-void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char* compatibility)
+void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char* compatibility)
 {    
 
   uart_puts("\n Hello , I am in SSD DTB \n");
@@ -551,8 +577,8 @@ void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_addres
 
          
 
-                        out_info->devices[out_info->device_count].mmio_base_address=mmio_base;
-                      out_info->devices[out_info->device_count].mmio_size=mmio_size;
+                        ssd_device_node.mmio_base_address=mmio_base;
+                      ssd_device_node.mmio_size=mmio_size;
                  
 
                      int i=0;
@@ -560,38 +586,35 @@ void extract_ssd_mmio_size(struct device_entry* device_node,uint8_t *base_addres
                      while(compatibility[i]!='\0')
                      {
                       uart_putc(compatibility[i]);
-                    out_info->devices[out_info->device_count].compatible[i]=compatibility[i];
+                    ssd_device_node.compatible[i]=compatibility[i];
                       i++;
                      }
                      uart_puts("\n");
-                     out_info->devices[out_info->device_count].compatible[i]='\0';
+                    ssd_device_node.compatible[i]='\0';
 
                      uart_puts("\n  SSD MMIO BASE\n ");
                      uart_puthex(mmio_base);
                      uart_puts("\nSSD MMIO SIZE\n ");
                      uart_puthex(mmio_size);
 
-                  out_info->device_count++;
-
-                    extract_virtio_queue_address(mmio_base,mmio_size);  
+                        if(str_eq(compatibility  , "virtio,mmio"))
+                        {
+                               extract_virtio_queue_address(mmio_base,mmio_size);  
                      
-  
-
-
-               
-                       
+                        }
+                                      
 }
 
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info , struct device_entry* device_node)
+void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info )
 {
        
-       device_node->irq_cells_count=interrupt_cells;
+       ssd_device_node.irq_cells_count=interrupt_cells;
 
        uint32_t * tracker_pointer = (uint32_t*)base_address ;
         int i=0 ;
        while((uint8_t*)tracker_pointer<base_address+len_to_read)
        {
-        device_node->irq_cells[i]=__builtin_bswap32(*tracker_pointer);
+        ssd_device_node.irq_cells[i]=__builtin_bswap32(*tracker_pointer);
         tracker_pointer=tracker_pointer+1;
         i++;
        }
@@ -600,10 +623,10 @@ void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_
 
 }
 
-void extract_ssd_gic_phandle_data(uint8_t* base_address  , struct device_entry* device_node)
+void extract_ssd_gic_phandle_data(uint8_t* base_address  )
 {
   uint32_t * reader = (uint32_t*)base_address;
-  device_node->interrupt_controller_phandle=__builtin_bswap32(*reader );
+  ssd_device_node.interrupt_controller_phandle=__builtin_bswap32(*reader );
 }
 
 

@@ -85,6 +85,7 @@ $sources = @(
     "src/mkMAU/mkmau_utils.c",
     "src/mkMAU/mobilemkMAU.c",
     "src/lib/dbt.c",
+     "src/lib/memcpy.c",
     "src/lib/alignbyte.c",
     "src/lib/quicksort.c",
     "src/driverCode/virtIO.c",
