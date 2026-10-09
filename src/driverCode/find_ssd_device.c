@@ -14,6 +14,7 @@
 void dump_hex(uintptr_t address, uint32_t length);
 
 
+/* This function is used for */
 void discover_ssd_device(struct hardware_info *out_info)
 {
     struct device_entry *ssd = &out_info->devices[SSD_DEVICE_INDEX];

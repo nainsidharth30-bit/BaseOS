@@ -3,6 +3,6 @@
 
 #include<stdint.h>
 
-    void memcopy(void * destination , void* source , uint8_t total_bytes) ; 
+    void memcopy(const void * destination , const void* source , uint32_t total_bytes) ; 
 
 #endif
