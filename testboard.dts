@@ -1,22 +1,24 @@
 /dts-v1/;
 
 /* =========================================================================
- * 1. BINARY HEADER RESERVATION TABLE (off_mem_rsvmap)
- *    Only put critical system firmware reserves here.
+ * BaseOS test board: QEMU virt (cortex-a53, 512 MB, GICv3)
+ *
+ * REAL      = hardware that really exists in QEMU (kernel may use it).
+ * FICTIONAL = hardware QEMU does NOT have. status = "disabled". Only there
+ *             to exercise the DTB parser. Parser/kernel must skip every
+ *             node whose status is "disabled".
+ *
+ * QEMU options needed:
+ *   -M virt,gic-version=3 -cpu cortex-a53 -smp 1 -m 512M
+ *   three disks (hd0, hd1, hd2) each with -device virtio-blk-device,drive=hdN
+ * QEMU hands out virtio-mmio slots from the HIGHEST address downward:
+ * 1st disk 0x0a003e00, 2nd 0x0a003c00, 3rd 0x0a003a00.
  * ========================================================================= */
 
-/* Reserve 1MB for custom DTB & early boot params @ 0x40000000 */
-/memreserve/ 0x0000000040000000 0x0000000000100000;
-
-/* ARM Trusted Firmware (TF-A / BL31) @ 0x40100000 (1MB) */
-/memreserve/ 0x0000000040100000 0x0000000000100000;
-
-/* OP-TEE Secure World RAM @ 0x40200000 (16MB) */
-/memreserve/ 0x0000000040200000 0x0000000001000000;
-
-/* GICv3 ITS Tables @ 0x41200000 (2MB) */
-/memreserve/ 0x0000000041200000 0x0000000000200000;
-
+/memreserve/ 0x0000000040000000 0x0000000000100000;  /* DTB + early boot */
+/memreserve/ 0x0000000040100000 0x0000000000100000;  /* TF-A BL31 */
+/memreserve/ 0x0000000040200000 0x0000000001000000;  /* OP-TEE */
+/memreserve/ 0x0000000041200000 0x0000000000200000;  /* GICv3 ITS tables */
 
 / {
     #address-cells = <2>;
@@ -24,56 +26,142 @@
     model = "ARM Cortex-A53 Reference Platform (BaseOS 512MB Layout)";
     compatible = "arm,cortex-a53-virt", "arm,vexpress";
 
-    /* Minimal Interrupt Controller stub to satisfy interrupt-parent */
-    interrupt-parent = <&gic>;
-    
+    interrupt-parent = <&gic>;   /* default parent, inherited by children */
+
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        cpu@0 {
+            device_type = "cpu";
+            compatible = "arm,cortex-a53";
+            reg = <0>;
+        };
+    };
+
+    memory@40000000 {
+        device_type = "memory";
+        reg = <0x00000000 0x40000000 0x00000000 0x20000000>;
+    };
+
+    /* ---------------- INTERRUPT CONTROLLERS ---------------- */
+
+    /* GICv3 (REAL). reg[0]=GICD, reg[1]=GICR (0x20000 per CPU).
+     * QEMU virt map: GICD 0x08000000, ITS 0x08080000, GICR 0x080a0000.
+     * #interrupt-cells=3: <type number flags>
+     *   type 0 = SPI (INTID = number + 32), type 1 = PPI (INTID = number + 16) */
     gic: interrupt-controller@8000000 {
         compatible = "arm,gic-v3";
         #interrupt-cells = <3>;
         interrupt-controller;
         #address-cells = <2>;
         #size-cells = <2>;
-        reg = <0x0 0x08000000 0x0 0x10000>;
+        ranges;
+        reg = <0x00000000 0x08000000 0x00000000 0x00010000>,   /* GICD */
+              <0x00000000 0x080a0000 0x00000000 0x00020000>;   /* GICR */
+
+        /* ITS is NOT an interrupt controller (msi-controller only). */
+        its: msi-controller@8080000 {
+            compatible = "arm,gic-v3-its";
+            msi-controller;
+            #msi-cells = <1>;
+            reg = <0x00000000 0x08080000 0x00000000 0x00020000>;
+        };
     };
 
-    /* Total Physical Memory Pool: 512MB RAM @ 0x40000000 to 0x60000000 */
-    memory@40000000 {
-        device_type = "memory";
-        reg = <0x00000000 0x40000000 0x00000000 0x20000000>;
+    /* Secondary IC (FICTIONAL): VIC cascaded behind the GIC.
+     * One interrupt cell: cell count is per controller, never global. */
+    ext_ic: interrupt-controller@b000000 {
+        compatible = "arm,pl190-vic";
+        reg = <0x00000000 0x0b000000 0x00000000 0x00001000>;
+        interrupt-controller;
+        #interrupt-cells = <1>;
+        interrupt-parent = <&gic>;
+        interrupts = <0 100 4>;
+        status = "disabled";
     };
 
-    /* =========================================================================
-     * 2. STORAGE CONTROLLER NODE (VirtIO MMIO)
-     * ========================================================================= */
-    virtio_block@a000000 {
+    /* ---------------- TIMER AND UART (REAL) ---------------- */
+
+    /* Order: secure phys (INTID 29), non-secure phys (30), virtual (27), hyp (26) */
+    timer {
+        compatible = "arm,armv8-timer";
+        interrupts = <1 13 4>,
+                     <1 14 4>,
+                     <1 11 4>,
+                     <1 10 4>;
+        always-on;
+    };
+
+    pl011@9000000 {
+        compatible = "arm,pl011", "arm,primecell";
+        reg = <0x00000000 0x09000000 0x00000000 0x00001000>;
+        interrupts = <0 1 4>;
+    };
+
+    /* ---------------- STORAGE ---------------- */
+
+    /* REAL: slot n at 0x0a000000 + n*0x200, interrupt SPI 16 + n. */
+    virtio_block@a003e00 {
         compatible = "virtio,mmio";
         reg = <0x00000000 0x0a003e00 0x00000000 0x00000200>;
         interrupts = <0 47 1>;
     };
 
-    /* =========================================================================
-     * 3. STRUCTURE BLOCK RESERVED-MEMORY NODES
-     *    Non-overlapping dynamic & driver memory reservations.
-     * ========================================================================= */
+    virtio_block@a003c00 {
+        compatible = "virtio,mmio";
+        reg = <0x00000000 0x0a003c00 0x00000000 0x00000200>;
+        interrupts = <0 46 1>;
+    };
+
+    /* explicit interrupt-parent, to test both forms */
+    virtio_block@a003a00 {
+        compatible = "virtio,mmio";
+        reg = <0x00000000 0x0a003a00 0x00000000 0x00000200>;
+        interrupt-parent = <&gic>;
+        interrupts = <0 45 1>;
+    };
+
+    /* FICTIONAL, disabled. (NVMe omitted: it is found via PCIe enumeration.) */
+    ufs@b010000 {
+        compatible = "jedec,ufs-2.0";
+        reg = <0x00000000 0x0b010000 0x00000000 0x00001000>;
+        interrupts = <0 101 4>;
+        status = "disabled";
+    };
+
+    ahci@b020000 {
+        compatible = "generic-ahci";
+        reg = <0x00000000 0x0b020000 0x00000000 0x00001000>;
+        interrupts = <0 102 4>;
+        status = "disabled";
+    };
+
+    /* behind the cascaded controller: parent ext_ic, one cell */
+    mmc@b030000 {
+        compatible = "arm,pl180", "arm,primecell";
+        reg = <0x00000000 0x0b030000 0x00000000 0x00001000>;
+        interrupt-parent = <&ext_ic>;
+        interrupts = <5>;
+        status = "disabled";
+    };
+
+    /* ---------------- RESERVED MEMORY ---------------- */
     reserved-memory {
         #address-cells = <2>;
         #size-cells = <2>;
         ranges;
 
-        /* DMA Memory Pool for Devices @ 0x42000000 (8MB) */
         dma_pool@42000000 {
             compatible = "shared-dma-pool";
             reg = <0x00000000 0x42000000 0x00000000 0x00800000>;
             reusable;
         };
 
-        /* Display Framebuffer Buffer @ 0x5E000000 (32MB) */
         framebuffer@5e000000 {
             reg = <0x00000000 0x5e000000 0x00000000 0x02000000>;
             no-map;
         };
 
-        /* Persistent Crash Log Buffer @ 0x5FE00000 (2MB) */
         ramoops@5fe00000 {
             compatible = "ramoops";
             reg = <0x00000000 0x5fe00000 0x00000000 0x00200000>;

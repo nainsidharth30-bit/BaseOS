@@ -87,6 +87,7 @@ $sources = @(
     "src/lib/dbt.c",
      "src/lib/memcpy.c",
     "src/lib/alignbyte.c",
+    "src/lib/setzero.c",
     "src/lib/quicksort.c",
     "src/driverCode/virtIO.c",
      "src/lib/compare_start_address.c"
