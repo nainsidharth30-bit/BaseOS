@@ -3,6 +3,8 @@
 #include "../../include/lib/dbt.h"
 #include "../../include/mkMAU/mkMAU.h"
 #include "../../include/driverHeaders/generic_struct_ssd.h"
+#include "../../include/interrupts/ic_bpt.h"
+
 
 struct hardware_info g_hw = {0} ;
 
@@ -19,7 +21,13 @@ struct hardware_info g_hw = {0} ;
 
 
     /* Pointer function to the present SSD driver , we are bining it to correct SSD driver on run time ! */
-   int (*ssd_driver)(struct ssd_request_bpt* bpt)=0;
+  //  int (*ssd_driver)(struct ssd_request_bpt* bpt)=0;
+
+
+
+
+
+
 
 
 

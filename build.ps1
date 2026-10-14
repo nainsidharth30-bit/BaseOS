@@ -79,7 +79,6 @@ $sources = @(
     "src/ccode/trampoline.c",
     "src/driverCode/uart.c",
     "src/driverCode/stack_track.c",
-    "src/driverCode/find_ssd_device.c",
      "src/driverCode/queue_address.c",
     "src/mkMAU/mkmau.c",
     "src/mkMAU/mkmau_utils.c",
@@ -90,7 +89,10 @@ $sources = @(
     "src/lib/setzero.c",
     "src/lib/quicksort.c",
     "src/driverCode/virtIO.c",
-     "src/lib/compare_start_address.c"
+     "src/lib/compare_start_address.c",
+     "src/interrupts/arm_cortex_a15_gic.c",
+     "src/interrupts/arm_pl190_vic.c",
+     "src/driverCode/ahci.c"
 )
 
 Write-Host "Compiling..." -ForegroundColor Cyan

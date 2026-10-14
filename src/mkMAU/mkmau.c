@@ -8,6 +8,7 @@
 #include "../../include/driverHeaders/find_ssd_device.h"
 #include "../../include/lib/quicksort.h"
 #include "../../include/lib/compare_start_address.h"
+#include "../../include/interrupts/ic_bpt.h"
  #include "../../include/lib/alignbyte.h"
 
 #include"stddef.h"
@@ -27,6 +28,7 @@
  In the last argument , the byte_flag , it is done for ssd_queue because Queue must be aligned to some value or position in Ram so giving this means to give the alignerd free range ! 
  */
  int mkMAU_find_free_range_for_range_nodes_array(uintptr_t kernel_start_address ,uint32_t merge_array_count , struct reserved_region *merged_array , uintptr_t number_of_bytes,uintptr_t* free_range_start_address,uintptr_t* free_range_end_address , struct hardware_info *out_info ,uint8_t byte_align ) ;
+
 
 
 
@@ -98,7 +100,7 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
 
     
  // merged_array is an array used for all inuse memory which either is reserved region and kernel occupied spaces ! 
-       struct reserved_region merged_array[(out_info->rsv_count+1+1+1)] ;
+       struct reserved_region merged_array[(out_info->rsv_count+1+1+1+1)] ;
         
 
 
@@ -232,9 +234,12 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
             temp--;
           }
 
-      uart_puts("Hewllooo");
 
-      discover_ssd_device(out_info);
+
+
+    
+
+      // discover_ssd_device(out_info);
 }
 
  void array_node_shift_end (struct mkmau_node* memory_tracker_array , size_t shift_units , size_t from_which_node ,size_t array_size )
@@ -331,3 +336,6 @@ void mkMAU_main(struct hardware_info * out_info , uintptr_t x1_register)
               
  
 }
+
+
+

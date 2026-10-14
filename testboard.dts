@@ -1,32 +1,36 @@
 /dts-v1/;
 
 /* =========================================================================
- * BaseOS test board: QEMU virt (cortex-a53, 512 MB, GICv3)
+ * BaseOS test board C: QEMU virt, cortex-a53, 512 MB, GICv2
  *
- * REAL      = hardware that really exists in QEMU (kernel may use it).
- * FICTIONAL = hardware QEMU does NOT have. status = "disabled". Only there
- *             to exercise the DTB parser. Parser/kernel must skip every
- *             node whose status is "disabled".
+ * QEMU options:  -M virt -cpu cortex-a53 -smp 1 -m 512M
+ *   one disk:    -drive if=none,file=build/ssd.img,format=raw,id=hd0
+ *                -device virtio-blk-device,drive=hd0        (slot 0x0a003e00)
  *
- * QEMU options needed:
- *   -M virt,gic-version=3 -cpu cortex-a53 -smp 1 -m 512M
- *   three disks (hd0, hd1, hd2) each with -device virtio-blk-device,drive=hdN
- * QEMU hands out virtio-mmio slots from the HIGHEST address downward:
- * 1st disk 0x0a003e00, 2nd 0x0a003c00, 3rd 0x0a003a00.
+ * Interrupt controllers (both enabled, neither has child nodes):
+ *   gic  : arm,cortex-a15-gic   REAL      3 interrupt cells
+ *   vic0 : arm,pl190-vic        FICTIONAL 1 interrupt cell, cascaded into gic
+ *
+ * Storage controllers (both enabled, different types, different parents):
+ *   virtio_block@a003e00 : virtio,mmio   REAL       parent = gic
+ *   mmc@b030000          : arm,pl180     FICTIONAL  parent = vic0
+ *
+ * Only virtio exists in QEMU. The kernel must NOT run an SSD driver for the
+ * MMC node; touching 0x0b030000 will fault. Driver selection by compatible
+ * must skip any controller that has no registered driver.
  * ========================================================================= */
 
 /memreserve/ 0x0000000040000000 0x0000000000100000;  /* DTB + early boot */
 /memreserve/ 0x0000000040100000 0x0000000000100000;  /* TF-A BL31 */
 /memreserve/ 0x0000000040200000 0x0000000001000000;  /* OP-TEE */
-/memreserve/ 0x0000000041200000 0x0000000000200000;  /* GICv3 ITS tables */
 
 / {
     #address-cells = <2>;
     #size-cells = <2>;
-    model = "ARM Cortex-A53 Reference Platform (BaseOS 512MB Layout)";
+    model = "ARM Cortex-A53 Reference Platform C (two ICs, two SSD types)";
     compatible = "arm,cortex-a53-virt", "arm,vexpress";
 
-    interrupt-parent = <&gic>;   /* default parent, inherited by children */
+    interrupt-parent = <&gic>;
 
     cpus {
         #address-cells = <1>;
@@ -45,104 +49,65 @@
 
     /* ---------------- INTERRUPT CONTROLLERS ---------------- */
 
-    /* GICv3 (REAL). reg[0]=GICD, reg[1]=GICR (0x20000 per CPU).
-     * QEMU virt map: GICD 0x08000000, ITS 0x08080000, GICR 0x080a0000.
-     * #interrupt-cells=3: <type number flags>
-     *   type 0 = SPI (INTID = number + 32), type 1 = PPI (INTID = number + 16) */
+    /* IC 0: GICv2. reg[0] = GICD, reg[1] = GICC. 3 interrupt cells. */
     gic: interrupt-controller@8000000 {
-        compatible = "arm,gic-v3";
+        compatible = "arm,cortex-a15-gic";
         #interrupt-cells = <3>;
         interrupt-controller;
-        #address-cells = <2>;
-        #size-cells = <2>;
-        ranges;
         reg = <0x00000000 0x08000000 0x00000000 0x00010000>,   /* GICD */
-              <0x00000000 0x080a0000 0x00000000 0x00020000>;   /* GICR */
-
-        /* ITS is NOT an interrupt controller (msi-controller only). */
-        its: msi-controller@8080000 {
-            compatible = "arm,gic-v3-its";
-            msi-controller;
-            #msi-cells = <1>;
-            reg = <0x00000000 0x08080000 0x00000000 0x00020000>;
-        };
+              <0x00000000 0x08010000 0x00000000 0x00010000>;   /* GICC */
     };
 
-    /* Secondary IC (FICTIONAL): VIC cascaded behind the GIC.
-     * One interrupt cell: cell count is per controller, never global. */
-    ext_ic: interrupt-controller@b000000 {
+    /* IC 1: PL190 VIC. 1 interrupt cell. Its single output line goes into
+     * the GIC as SPI 100 (interrupt-parent + interrupts below). */
+    vic0: interrupt-controller@b000000 {
         compatible = "arm,pl190-vic";
         reg = <0x00000000 0x0b000000 0x00000000 0x00001000>;
         interrupt-controller;
         #interrupt-cells = <1>;
         interrupt-parent = <&gic>;
         interrupts = <0 100 4>;
-        status = "disabled";
     };
 
-    /* ---------------- TIMER AND UART (REAL) ---------------- */
+    /* ---------------- OTHER PERIPHERALS ---------------- */
 
-    /* Order: secure phys (INTID 29), non-secure phys (30), virtual (27), hyp (26) */
     timer {
         compatible = "arm,armv8-timer";
-        interrupts = <1 13 4>,
-                     <1 14 4>,
-                     <1 11 4>,
-                     <1 10 4>;
+        interrupts = <1 13 0x104>,
+                     <1 14 0x104>,
+                     <1 11 0x104>,
+                     <1 10 0x104>;
         always-on;
     };
 
-    pl011@9000000 {
+    pl011@9000000 {                       /* console UART, SPI 1, REAL */
         compatible = "arm,pl011", "arm,primecell";
         reg = <0x00000000 0x09000000 0x00000000 0x00001000>;
         interrupts = <0 1 4>;
     };
 
-    /* ---------------- STORAGE ---------------- */
+    rtc@9010000 {                         /* PL031 RTC, SPI 2, REAL */
+        compatible = "arm,pl031", "arm,primecell";
+        reg = <0x00000000 0x09010000 0x00000000 0x00001000>;
+        interrupts = <0 2 4>;
+    };
 
-    /* REAL: slot n at 0x0a000000 + n*0x200, interrupt SPI 16 + n. */
+    /* ---------------- STORAGE CONTROLLERS ---------------- */
+
+    /* SSD A: virtio-mmio block, parent = GIC (3 cells), REAL */
     virtio_block@a003e00 {
         compatible = "virtio,mmio";
         reg = <0x00000000 0x0a003e00 0x00000000 0x00000200>;
+        interrupt-parent = <&gic>;
         interrupts = <0 47 1>;
     };
 
-    virtio_block@a003c00 {
-        compatible = "virtio,mmio";
-        reg = <0x00000000 0x0a003c00 0x00000000 0x00000200>;
-        interrupts = <0 46 1>;
-    };
-
-    /* explicit interrupt-parent, to test both forms */
-    virtio_block@a003a00 {
-        compatible = "virtio,mmio";
-        reg = <0x00000000 0x0a003a00 0x00000000 0x00000200>;
-        interrupt-parent = <&gic>;
-        interrupts = <0 45 1>;
-    };
-
-    /* FICTIONAL, disabled. (NVMe omitted: it is found via PCIe enumeration.) */
-    ufs@b010000 {
-        compatible = "jedec,ufs-2.0";
-        reg = <0x00000000 0x0b010000 0x00000000 0x00001000>;
-        interrupts = <0 101 4>;
-        status = "disabled";
-    };
-
+    /* SSD B: AHCI SATA controller, parent = GIC (3 cells), FICTIONAL */
     ahci@b020000 {
         compatible = "generic-ahci";
         reg = <0x00000000 0x0b020000 0x00000000 0x00001000>;
+        interrupt-parent = <&gic>;
         interrupts = <0 102 4>;
-        status = "disabled";
-    };
-
-    /* behind the cascaded controller: parent ext_ic, one cell */
-    mmc@b030000 {
-        compatible = "arm,pl180", "arm,primecell";
-        reg = <0x00000000 0x0b030000 0x00000000 0x00001000>;
-        interrupt-parent = <&ext_ic>;
-        interrupts = <5>;
-        status = "disabled";
     };
 
     /* ---------------- RESERVED MEMORY ---------------- */

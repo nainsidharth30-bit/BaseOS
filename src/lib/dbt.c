@@ -13,6 +13,10 @@
 #include "../../include/string_utility.h"
 #include "../../include/lib/memcpy.h"
 
+#include"../interrupts/arm_cortex_a15_gic.h"
+#include"../interrupts/arm_pl190_vic.h"
+#include"../../include/driverHeaders/VIRTIO.h"
+#include"../../include/driverHeaders/ahci.h"
 
 
 /*
@@ -54,14 +58,8 @@ padding-------->4 bytes aligned padding !
 This function extract those reserved regions which are present inside the structure_block of dtb 
 */
 void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_to_read , struct hardware_info* out_info,uint32_t address_cells ,uint32_t size_cells);
-/*
-This function extract irq line data for SSD device 
-*/
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info );
-/*
-This function extract the phandle , means a pointer which points toward the interrupt controller for the SSD device  
-*/
-void extract_ssd_interrupt_controller_phandle_data(uint8_t* base_address );
+
+
 /*
 To get the total size of the tree 
 */
@@ -80,30 +78,29 @@ We are discarding dbt when the data we want is extracted , from then it has no u
   /* Extracts the ram base and ram size */
 void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells , struct hardware_info* out_info);
 
-/* extract ssd mmio base and mmio size */
-void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info,char* compatibility);
+/*
+This function extracts IC Data 
+*/
 
-void extract_ic_phandle(uint8_t *base_address, size_t len_to_read);
-
-void extract_mmio_base_size_ic(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells );
-
-void populate_ic_array(struct hardware_info* out_info);
-
-void populate_devices_array_for_ssd_devices(struct hardware_info*out_info) ;
-
+void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_controller_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info );
+/*
+This Function extracts the  SSD devices Data  
+*/
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells, const struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info );
 
 
 
-struct ic_entry ic_node = {0};
-struct ic_entry* ic_ptr = &ic_node ;     
+  /* Index Array to traverse out_info->devices array efficiently ! */
 
 
-uint16_t ssd_index_array [20];
-uint8_t ssd_index_array_count = 0 ;         
+uint16_t ssd_index_array [10];
+uint8_t ssd_index_array_count = 0 ;    
 
-uint16_t ic_index_array[20];     
-uint8_t ic_index_array_count =0;
 
+uint16_t ic_index_array [20];
+uint8_t ic_index_array_count = 0 ;
+
+ /* Index Array to traverse out_info->devices array efficiently Over  ! */
 
 
 
@@ -112,7 +109,12 @@ uint8_t ic_index_array_count =0;
 //                                                                  CODE STARTS FROM HERE ! 
 
      
-   struct device_entry ssd_device_node ;  // For Storing the SSD Controller information , no matter which model of SSD Controller ! 
+   struct device_entry ssd_device_node = {0} ;  // For Storing the SSD Controller information , no matter which model of SSD Controller ! 
+
+   struct device_entry ic_node = {0};
+   
+
+
 
 
 
@@ -144,38 +146,108 @@ After extracting all the resreved regions , I am sorting all the reserved region
 
           uart_puts("\n ALl Data Extracted \n");
 
-          for (uint8_t i = 0; i < out_info->number_of_ic_devices; i++) {
-    struct ic_entry *ic = &out_info->ic_devices[i];
 
-    uart_puts("\n===== IC #");
+          /* ============================================================
+ * Print all SSD devices, using ssd_index_array to find them
+ * ============================================================ */
+uart_puts("\n\n===== SSD DEVICES =====\n");
+uart_puts("ssd_index_array_count = ");
+uart_puthex(ssd_index_array_count);
+uart_puts("\n");
+
+for (uint32_t i = 0; i < ssd_index_array_count; i++) {
+    uint32_t idx = ssd_index_array[i];
+    struct device_entry *d = &out_info->devices[idx];
+
+    uart_puts("\nSSD #");
     uart_puthex(i);
-    uart_puts(" =====\n");
+    uart_puts(" (devices[");
+    uart_puthex(idx);
+    uart_puts("])\n");
 
     uart_puts("  phandle    = ");
-    uart_puthex(ic->phandle);
+    uart_puthex(d->phandle);
     uart_puts("\n");
 
     uart_puts("  compatible = ");
-    uart_puts(ic->ic_compatible);
+    uart_puts(d->compatible);
     uart_puts("\n");
 
-    uart_puts("  banks      = ");
-    uart_puthex(ic->number_of_mmio_base_size);
+    uart_puts("  mmio_array_count = ");
+    uart_puthex(d->mmio_base_size_array_count);
     uart_puts("\n");
 
-    for (uint8_t j = 0; j + 1 < 6; j += 2) {
-        if (ic->ic_mmio_base_size_array[j] == 0 &&
-            ic->ic_mmio_base_size_array[j + 1] == 0) {
-            break;
-        }
+    for (uint32_t p = 0; p + 1 < d->mmio_base_size_array_count; p += 2) {
         uart_puts("    base = ");
-        uart_puthex(ic->ic_mmio_base_size_array[j]);
+        uart_puthex(d->mmio_base_size_array[p]);
         uart_puts("  size = ");
-        uart_puthex(ic->ic_mmio_base_size_array[j + 1]);
+        uart_puthex(d->mmio_base_size_array[p + 1]);
         uart_puts("\n");
     }
+
+    uart_puts("  irq_cells_count = ");
+    uart_puthex(d->irq_cells_count);
+    uart_puts("\n");
+
+    for (uint32_t c = 0; c < d->irq_cells_count; c++) {
+        uart_puts("    irq_cell[");
+        uart_puthex(c);
+        uart_puts("] = ");
+        uart_puthex(d->irq_cells[c]);
+        uart_puts("\n");
+    }
+
+    uart_puts("  ssd_code fn = ");
+    uart_puthex((uintptr_t)d->ssd_code);
+    uart_puts("\n");
 }
 
+
+/* ============================================================
+ * Print all IC devices, using ic_index_array to find them
+ * ============================================================ */
+uart_puts("\n\n===== IC DEVICES =====\n");
+uart_puts("ic_index_array_count = ");
+uart_puthex(ic_index_array_count);
+uart_puts("\n");
+
+for (uint32_t i = 0; i < ic_index_array_count; i++) {
+    uint32_t idx = ic_index_array[i];
+    struct device_entry *d = &out_info->devices[idx];
+
+    uart_puts("\nIC #");
+    uart_puthex(i);
+    uart_puts(" (devices[");
+    uart_puthex(idx);
+    uart_puts("])\n");
+
+    uart_puts("  phandle    = ");
+    uart_puthex(d->phandle);
+    uart_puts("\n");
+
+    uart_puts("  compatible = ");
+    uart_puts(d->compatible);
+    uart_puts("\n");
+
+    uart_puts("  mmio_array_count = ");
+    uart_puthex(d->mmio_base_size_array_count);
+    uart_puts("\n");
+
+    for (uint32_t p = 0; p + 1 < d->mmio_base_size_array_count; p += 2) {
+        uart_puts("    base = ");
+        uart_puthex(d->mmio_base_size_array[p]);
+        uart_puts("  size = ");
+        uart_puthex(d->mmio_base_size_array[p + 1]);
+        uart_puts("\n");
+    }
+
+    uart_puts("  ic_code fn = ");
+    uart_puthex((uintptr_t)d->ic_code);
+    uart_puts("\n");
+}
+uart_puts("\n\n");
+
+          
 
 }
 
@@ -278,86 +350,35 @@ Where it appears: same place as #address-cells — on the parent, not the child.
 Where it appears: on the interrupt controller node — the node that will interpret the interrupts. Not on the device.
         */
         uint32_t  interrupt_cells = 0 ;
+
       
 
        int reserved_regions_depth = -1;
        int depth =0 ;
+
+       
 
 
 
 
        //------------------SSD CONTROLLERS ARRAY ----------//
        /*An Array which stores names of various SSD Controller ! */
-       static const char *ssd_compatibles[] = {
-    /* --- Virtual / Generic --- */
-    "virtio,mmio",              /* QEMU, KVM, Firecracker */
-    "generic-ahci",             /* Fallback for any standard AHCI */
-
-    /* --- NVMe (PCIe SSDs) --- */
-    "nvme",                     /* Standard PCIe NVMe */
-    "apple,nvme-ans2",          /* Apple Silicon */
-    "qcom,ufshc",               /* Qualcomm UFS (often used as boot storage) */
-
-    /* --- UFS (Universal Flash Storage) --- */
-    "jedec,ufs-1.1",            /* UFS 1.1 standard */
-    "jedec,ufs-2.0",            /* UFS 2.0+ standard (mobile/embedded) */
-    "qcom,ufshc",               /* Qualcomm UFS host */
-
-    /* --- SATA / AHCI (Embedded & Server) --- */
-    "snps,dwc-ahci",            /* Synopsys DesignWare (most common IP) */
-    "snps,spear-ahci",          /* ST Spear */
-    "marvell,armada-3700-ahci", /* Marvell Armada */
-    "marvell,armada-8k-ahci",   /* Marvell Armada 8K */
-    "brcm,sata3-ahci",          /* Broadcom SATA3 */
-    "hisilicon,hisi-ahci",      /* HiSilicon */
-    "cavium,octeon-7130-ahci",  /* Cavium Octeon */
-
-    /* --- SD/MMC / eMMC (Most common on small RISC chips) --- */
-    "sdhci",                    /* Standard SD Host Controller Interface */
-    "snps,dw-mshc",             /* Synopsys DesignWare Mobile Storage */
-    "arm,pl180",                /* ARM PrimeCell (older) */
-    "mediatek,mt8173-mmc",      /* MediaTek */
-
-    NULL
+   static const struct ic_compatible_entry ic_compatibles[] = {
+ { "arm,cortex-a15-gic", arm_cortex_a15_gic },
+    { "arm,pl190-vic",      arm_pl190_vic      },
+    { 0, 0 }
 };
-
 //---------------- SSD CONTROLLERS ARRAY OVER --------//
 
-
-//----------------- Interrupt controllers compatible Array---//
-
-static const char *interrupt_controller_compatibles[] = {
-    "arm,gic-v3",
-    "arm,gic-v3-its",
-    "arm,gic-400",
-    "arm,cortex-a15-gic",
-    "arm,cortex-a7-gic",
-    "arm,cortex-a9-gic",
-    "arm,cortex-a5-gic",
-    "arm,pl390",
-    "arm,pl192-vic",
-    "arm,pl190-vic",
-    "arm,versatile-fpga-irq",
-    "arm,nvic",
-    "arm,armv8m-nvic",
-    "riscv,plic0",
-    "sifive,plic-1.0.0",
-    "riscv,cpu-intc",
-    "riscv,aclint-mswi",
-    "riscv,aclint-mtimer",
-    "riscv,clint0",
-    "sifive,clint0",
-    "mti,cpu-interrupt-controller",
-    "mti,gic",
-    "img,pdc",
-    "cdns,xtensa-pic",
-    "loongson,liointc",
-    "loongson,htvec",
-    "loongson,htpic",
-    NULL
+static const struct ssd_compatible_entry ssd_compatibles[] = {
+     { "virtio,mmio", virtio_ssd_driver },
+    { "generic-ahci", ahci_driver },
+    { 0, 0 }
+    
 };
 
-//----------------- Interrupt controllers compatible Array Over ---//
+
+
       
 
        //  -------- FLAG SECTION  ---------------------//
@@ -372,13 +393,15 @@ static const char *interrupt_controller_compatibles[] = {
      
          uint8_t compatible_flag =0;
 
+         uint8_t interrupt_cells_flag=0;
         
          uint8_t interrupt_controller_flag = 0 ; 
 
          uint8_t phandle_flag = 0 ;
 
+         uint8_t not_disabled_flag = 1 ;
 
-
+        
 
 
        //----------- FLAG SECTION OVER ---------------//
@@ -396,7 +419,7 @@ static const char *interrupt_controller_compatibles[] = {
              
 
            
-             char compatible_buffer[12] = "";
+             char compatible_buffer[40] = ""; 
 
              /* Stores the value of the phandle ! */
 
@@ -424,7 +447,7 @@ static const char *interrupt_controller_compatibles[] = {
 
         if(token==FDT_BEGIN_NODE)
         {
-
+          
           // We are setting the initial Values of all variables , buffers and flags so that we do not get data from previous iterations ! 
           
           address_cells=2;
@@ -439,13 +462,17 @@ static const char *interrupt_controller_compatibles[] = {
           irq_line_len=0;
           compatible_buffer[0] = '\0'; 
           phandle_flag=0;
+          not_disabled_flag=1;
+          interrupt_cells=0;
+          interrupt_cells_flag=0;
 
                   interrupt_controller_buffer = NULL;
              interrupt_buffer_len = 0 ;
              interrupt_controller_flag=0;
 
-             set_zero(ic_ptr,sizeof(struct ic_entry));
+          
              set_zero(&ssd_device_node,sizeof(struct device_entry));
+             set_zero(&ic_node,sizeof(struct device_entry));
           
 
 
@@ -520,6 +547,7 @@ static const char *interrupt_controller_compatibles[] = {
 {
  
     interrupt_cells = __builtin_bswap32(*(uint32_t *)one_byte_tracker_pointer);
+    interrupt_cells_flag=1;
 }
 
       /*
@@ -541,6 +569,7 @@ If not → the node is something else (a device, a bus, memory, etc.)
 {
     interrupt_controller_flag = 1;
 }
+
 
       
   
@@ -581,56 +610,20 @@ device_type is now deprecated for most uses. Modern device trees use compatible 
 
 
 
-        if(str_eq(prop_name,"compatible"))
-    {
-      compatible_flag=1;
+if (str_eq(prop_name, "compatible"))
+{
+    compatible_flag = 1;
 
-      /*
-      Now we are checking if it is compatible for some ssd controller ! 
-      */
-      
-              for(int iterator = 0 ; ssd_compatibles[iterator]!=NULL;iterator++)
-              {
-                if(str_eq((const char*)one_byte_tracker_pointer,ssd_compatibles[iterator]))
-                {  
-                   ssd_node_flag=1;
-                   int len = 0 ;
-                  
-                   while(ssd_compatibles[iterator][len]!='\0')
-                   {
-                    len++;
-                   }
-                   len++;
-                   memcopy(compatible_buffer,ssd_compatibles[iterator],len);
-                   break;
-                }
-              }
-
-              /* Now We are checking if it is compatible for some interrupt controller ! */
-   
-               for(int iterator=0 ; interrupt_controller_compatibles[iterator]!=NULL ; iterator++)
-               {
-                if(str_eq((const char*)one_byte_tracker_pointer,interrupt_controller_compatibles[iterator]))
-                {
-                  interrupt_controller_flag=1;
-                  int len =0 ;
-                  while(interrupt_controller_compatibles[iterator][len]!='\0')
-                  {
-                    len++;
-                  }
-                  len++;
-                  memcopy(compatible_buffer,interrupt_controller_compatibles[iterator],len);
-                  break;
-                }
-               }
-
-
-
-
-
-
+    int n = 0;                                  /* copy first string */
+    while (n < (int)sizeof(compatible_buffer) - 1 && one_byte_tracker_pointer[n] != '\0') {
+        compatible_buffer[n] = one_byte_tracker_pointer[n];
+        n++;
     }
+    compatible_buffer[n] = '\0';
 
+    for (int k = 0; ssd_compatibles[k].compatible != 0; k++)   /* is it an SSD? */
+        if (str_eq(ssd_compatibles[k].compatible, compatible_buffer)) { ssd_node_flag = 1; break; }
+}
     /*
     The reg property gives us pair of values (address,size ) which tells us about base address of some device and its size , for example the mmio_base_address of some devices and their size also example any ssd controller , gic controller ,reserved regions  and so on , so it gives pairs of (address,size )
     */
@@ -666,6 +659,14 @@ It's a single phandle — a reference to the controller node. Without it, the ce
          interrupt_parent_len=len;
       }
 
+
+      if(str_eq(prop_name,"status"))
+      {
+        if(str_eq(one_byte_tracker_pointer,"disabled"))
+        {
+          not_disabled_flag=0;
+        }
+      }
       
 
 
@@ -697,40 +698,37 @@ It's a single phandle — a reference to the controller node. Without it, the ce
         extract_ram_info(reg_buffer,reg_len,address_cells,size_cells,out_info);
       }
 
-      if(ssd_node_flag && reg_buffer && reg_len)
-      { 
-        
-        extract_ssd_mmio_size(reg_buffer,reg_len,address_cells,size_cells,out_info,compatible_buffer);
-      }
-
-     
-
-       
-
-      if(ssd_node_flag && irq_line_buffer && irq_line_len)
-      {
-       
-        extract_ssd_irq_line_data(irq_line_buffer,irq_line_len,interrupt_cells,out_info);
-      }
-
-      if(ssd_node_flag && interrupt_parent_buffer )
-      {
-        
-        extract_ssd_interrupt_controller_phandle_data(interrupt_parent_buffer);
       
+
+
+      /*
+      Extracting SSD Controller Data ! 
+      */
+
+
+      if(ssd_node_flag&&compatible_flag&&reg_len&&interrupt_parent_len&&irq_line_len&&not_disabled_flag&&interrupt_cells_flag)
+      {
+       extract_ssd_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ssd_compatibles,out_info);
       }
 
-      if(ssd_node_flag&&compatible_flag)
+
+
+     /*
+      Extracting SSD Controller Data Over ! 
+      */
+
+
+      /*
+      Extracting IC Controller Data ! 
+      */
+
+      if(interrupt_controller_flag&&reg_len&&compatible_flag&&not_disabled_flag&&phandle_flag)
       {
-            
-        int len =0 ;
-        while(compatible_buffer[len]!='\0')
-        {
-          len++;
-        }
-        len++;    
-        memcopy(ssd_device_node.compatible,compatible_buffer,len);
+        extract_ic_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_controller_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ic_compatibles,out_info);
       }
+
+
+
 
             if (resreved_memory_dt_struct_flag && reg_buffer && reg_len )
       {
@@ -741,30 +739,14 @@ It's a single phandle — a reference to the controller node. Without it, the ce
 
 
     
-      if(interrupt_controller_buffer&&interrupt_controller_flag&&interrupt_buffer_len)
-      {
-        // Used to extract phandle value ! 
-            extract_ic_phandle(interrupt_controller_buffer,  interrupt_buffer_len);
-      }
+ 
 
-      if(reg_buffer&&interrupt_controller_flag&&reg_len)
-      {
-        // Extract MMIO Base and size of IC ! 
-           
- extract_mmio_base_size_ic(reg_buffer,reg_len,address_cells,size_cells) ;
-      }
 
-      if(compatible_buffer[0] != '\0'&&compatible_flag&&interrupt_controller_flag)
-      {
-        int len =0 ;
-        while(compatible_buffer[len]!='\0')
-        {
-          len++;
-        }
-        len++;    
-        memcopy(ic_ptr->ic_compatible,compatible_buffer,len);
 
-      }
+
+
+
+
 
 
 
@@ -777,27 +759,26 @@ It's a single phandle — a reference to the controller node. Without it, the ce
           reg_len=0;
           irq_line_buffer=NULL;
           irq_line_len=0;
+          interrupt_buffer_len=0;
+          interrupt_parent_buffer=NULL;
+          interrupt_cells=0;
+          interrupt_cells_flag=0;
           
           compatible_buffer[0] = '\0'; 
+          not_disabled_flag=1;
+
+             set_zero(&ssd_device_node,sizeof(struct device_entry));
+             set_zero(&ic_node,sizeof(struct device_entry));
 
 
-          if(ssd_node_flag)
-          {
-            populate_devices_array_for_ssd_devices(out_info);
-          }
-           set_zero(&ssd_device_node,sizeof(struct device_entry));
-
-           if(interrupt_controller_flag)
-           {
-            populate_ic_array(out_info);
-           }
-           set_zero(ic_ptr,sizeof(struct ic_entry));
 
           if (reserved_regions_depth != -1 && depth == reserved_regions_depth) {
     resreved_memory_dt_struct_flag = 0;
     reserved_regions_depth = -1;
                               }
 depth--;
+
+
          
         }
         else
@@ -866,108 +847,8 @@ void extract_ram_info(uint8_t *base_address, size_t len_to_read,uint32_t address
     uart_puts("\n");
     uart_puthex(out_info->ram_size);
     uart_puts("\n");
+    
 }
-
-void extract_ssd_mmio_size(uint8_t *base_address, size_t len_to_read,uint32_t address_cells, uint32_t size_cells, struct hardware_info *out_info ,char* compatibility)
-{    
-
-  uart_puts("\n Hello , I am in SSD DTB \n");
-  
-
-
-      uint64_t mmio_base = 0;
-       
-    uint64_t mmio_size = 0;
-     
-
-    uint32_t total_cells = address_cells + size_cells;
-
-    if (total_cells == 0)
-    {
-        return;
-    }
-
-    if (len_to_read < (size_t)(total_cells * 4))
-    {
-        return;
-    }
-
-    if (address_cells > 2)
-    {
-        address_cells = 2;
-    }
-
-    if (size_cells > 2)
-    {
-        size_cells = 2;
-    }
-
-    uint32_t iterator = 0;
- 
-             while (iterator < address_cells)
-    {
-        uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + iterator * 4));
-                mmio_base = (mmio_base << 32) | one_cell;
-                 iterator++;
-    }
-
-               iterator = 0;
-
-                  while (iterator < size_cells)
-            {
-                 uint32_t one_cell = __builtin_bswap32(*(uint32_t *)(base_address + address_cells * 4 + iterator * 4));
-        mmio_size = (mmio_size << 32) | one_cell;
-                iterator++;
-         }
-
-         
-
-                        ssd_device_node.mmio_base_address=mmio_base;
-                      ssd_device_node.mmio_size=mmio_size;
-                 
-
-                    //  int i=0;
-                    //  uart_puts("\n  SSD COMPATIBLE  \n ");
-                    //  while(compatibility[i]!='\0')
-                    //  {
-                    //   uart_putc(compatibility[i]);
-                    // ssd_device_node.compatible[i]=compatibility[i];
-                    //   i++;
-                    //  }
-                    //  uart_puts("\n");
-                    // ssd_device_node.compatible[i]='\0';
-
-                     uart_puts("\n  SSD MMIO BASE\n ");
-                     uart_puthex(mmio_base);
-                     uart_puts("\nSSD MMIO SIZE\n ");
-                     uart_puthex(mmio_size);                                      
-}
-
-void extract_ssd_irq_line_data(uint8_t *base_address, size_t len_to_read,uint32_t interrupt_cells,  struct hardware_info *out_info )
-{
-       
-       ssd_device_node.irq_cells_count=interrupt_cells;
-
-       uint32_t * tracker_pointer = (uint32_t*)base_address ;
-        int i=0 ;
-       while((uint8_t*)tracker_pointer<base_address+len_to_read)
-       {
-        ssd_device_node.irq_cells[i]=__builtin_bswap32(*tracker_pointer);
-        tracker_pointer=tracker_pointer+1;
-        i++;
-       }
-
-       
-
-}
-
-void extract_ssd_interrupt_controller_phandle_data(uint8_t* base_address  )
-{
-  uint32_t * reader = (uint32_t*)base_address;
-  ssd_device_node.interrupt_controller_phandle=__builtin_bswap32(*reader );
-}
-
-
 
 void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_to_read , struct hardware_info* out_info,uint32_t address_cells ,uint32_t size_cells )
 {
@@ -1014,80 +895,229 @@ void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_t
 
 }
 
-
-
-
-void extract_ic_phandle(uint8_t *base_address, size_t len_to_read)
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const  struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info )
 {
-    if(len_to_read==4)
-    {
-      ic_ptr->phandle = __builtin_bswap32(*(uint32_t*)base_address );
-      return ;
-    }
-    uart_puts("\n Some Problem in length to read \n");
-}
+    /*
+    Extracting mmio base and mmio size first ! 
+    */
 
+     uint32_t* tracker = (uint32_t*)reg_buffer ; 
+     uint32_t read_bytes = 0 ;
 
-void extract_mmio_base_size_ic(uint8_t* base_address , size_t len_to_read , uint32_t address_cells , uint32_t size_cells )
-{
-    
-      uint8_t* one_byte_tracker_pointer = base_address ;
-      uint32_t i = 0 ;
+     while(read_bytes<reg_len)
+     {
+        uintptr_t mmio_base = 0 ; 
+        uintptr_t mmio_size = 0 ; 
 
-      while(i<len_to_read)
-      {
-               uint64_t mmio_base =0 ; 
-       uint64_t mmio_size=0 ;
-
-        int j =0 ; 
-        while(j<address_cells)
+        int a_c = 0 ;
+        while(a_c!=address_cells)
         {
-          uint32_t cell = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer) ;
-          mmio_base = (mmio_base<<32)|cell ;
-          one_byte_tracker_pointer = one_byte_tracker_pointer + 4 ;
-          j++ ;
+          uint32_t cell = __builtin_bswap32(*tracker);
+          mmio_base = (mmio_base<<32)|cell ; 
+          a_c++;
+          tracker++;
+          read_bytes = read_bytes+4;
         }
-        j=0;
-        while(j<size_cells)
+        int s_c = 0 ; 
+        while(s_c!=size_cells)
         {
-          uint32_t cell =  __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer) ;
-          mmio_size = (mmio_size<<32)|cell;
-          one_byte_tracker_pointer=one_byte_tracker_pointer+4;
-          j++;
+          uint32_t cell = __builtin_bswap32(*tracker);
+          mmio_size = (mmio_size<<32)|cell ;
+          s_c++;
+          tracker++;
+          read_bytes = read_bytes+4;
         }
 
-        
-        if(ic_ptr->number_of_mmio_base_size!=0)
-        {
-           ic_ptr->number_of_mmio_base_size++;
-        }
+        ssd_device_node.mmio_base_size_array[ssd_device_node.mmio_base_size_array_count] = mmio_base ; 
+        ssd_device_node.mmio_base_size_array_count++ ; 
+        ssd_device_node.mmio_base_size_array[ssd_device_node.mmio_base_size_array_count] = mmio_size ; 
+         ssd_device_node.mmio_base_size_array_count++ ; 
+     }
 
-        ic_ptr->ic_mmio_base_size_array[ic_ptr->number_of_mmio_base_size]=mmio_base;
-        ic_ptr->number_of_mmio_base_size++;
-        ic_ptr->ic_mmio_base_size_array[ic_ptr->number_of_mmio_base_size]=mmio_size;
-
-
-        i = i + 4 * address_cells + 4 * size_cells;
-      }
-}
-
-void populate_ic_array(struct hardware_info* out_info)
-{
+     /*
+     Extracting Compatibles and assigning Function Poinrter Driver ! 
+     */
    
-         memcopy(&out_info->ic_devices[out_info->number_of_ic_devices],ic_ptr,sizeof(struct ic_entry));
-         ic_index_array[ic_index_array_count]=out_info->number_of_ic_devices;
-         ic_index_array_count++;
-         out_info->number_of_ic_devices++;
+     int i = 0 ; 
+     while(ssd_compatibles[i].compatible!=0&&ssd_compatibles[i].ssd_code!=0)
+     {
+      if(str_eq(ssd_compatibles[i].compatible,compatible_buffer))
+      {
+        int len = 0 ; 
+        while(compatible_buffer[len]!='\0')
+        {
+          len++;
+        }
+        len++;
+        memcopy(ssd_device_node.compatible,compatible_buffer,len);
+        ssd_device_node.ssd_code=ssd_compatibles[i].ssd_code ; 
+        break;
+      }
+      i++;
+     }
+
+     /*
+     Extracting the phandle now , ouyt of interrupt-parent property ! 
+     */
+
+     tracker = (uint32_t*)interrupt_parent_buffer ; 
+
+     uint32_t phandle = __builtin_bswap32(*tracker) ; 
+
+     /*Extracting irq line Data ! */
+
+     tracker = (uint32_t*)irq_line_buffer ; 
+     int i_c = 0 ; 
+     while(i_c!=interrupt_cells)
+     {
+        uint32_t cell = __builtin_bswap32(*tracker);
+        ssd_device_node.irq_cells[ssd_device_node.irq_cells_count] = cell; 
+        tracker++;
+        ssd_device_node.irq_cells_count ++ ;
+        i_c++;
+     }
+
+     /*
+     Copying in devices array and updating the ssd_index_array ! 
+     */
+
+     /* ---- print ssd_device_node before copy ---- */
+     uart_puts("\n===== SSD NODE (pre-copy) =====\n");
+     uart_puts("  phandle    = ");
+     uart_puthex(ssd_device_node.phandle);
+     uart_puts("\n");
+     uart_puts("  compatible = ");
+     uart_puts(ssd_device_node.compatible);
+     uart_puts("\n");
+     uart_puts("  mmio_array_count = ");
+     uart_puthex(ssd_device_node.mmio_base_size_array_count);
+     uart_puts("\n");
+     for (uint32_t p = 0; p + 1 < ssd_device_node.mmio_base_size_array_count; p += 2) {
+         uart_puts("    base = ");
+         uart_puthex(ssd_device_node.mmio_base_size_array[p]);
+         uart_puts("  size = ");
+         uart_puthex(ssd_device_node.mmio_base_size_array[p + 1]);
+         uart_puts("\n");
+     }
+     uart_puts("  irq_cells_count = ");
+     uart_puthex(ssd_device_node.irq_cells_count);
+     uart_puts("\n");
+     for (uint32_t c = 0; c < ssd_device_node.irq_cells_count; c++) {
+         uart_puts("    irq_cell[");
+         uart_puthex(c);
+         uart_puts("] = ");
+         uart_puthex(ssd_device_node.irq_cells[c]);
+         uart_puts("\n");
+     }
+     uart_puts("  ssd_code fn = ");
+     uart_puthex((uintptr_t)ssd_device_node.ssd_code);
+     uart_puts("\n");
+
+
+     memcopy(&out_info->devices[out_info->device_count] ,&ssd_device_node,sizeof(struct device_entry) );
+     ssd_index_array[ssd_index_array_count]=out_info->device_count;
+     ssd_index_array_count++;
+     out_info->device_count++ ; 
 
 }
 
-void populate_devices_array_for_ssd_devices(struct hardware_info*out_info)
+
+void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_controller_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info )
 {
-  memcopy(&out_info->devices[out_info->device_count],&ssd_device_node,sizeof(struct device_entry));
-  ssd_index_array[ssd_index_array_count]=out_info->device_count;
-  ssd_index_array_count++;
-  out_info->device_count++;
+  /* Extracting MMIO Base and MMIO size Data ! */
+
+  uint32_t* tracker = (uint32_t*)reg_buffer ; 
+  uint32_t bytes_read =  0 ; 
+
+  while(bytes_read<reg_len)
+  {
+     uintptr_t mmio_base = 0 ;
+     uintptr_t mmio_size = 0 ; 
+
+     int a_c = 0 ; 
+     while(a_c<address_cells)
+     {
+      uint32_t cell = __builtin_bswap32(*tracker) ; 
+      mmio_base = (mmio_base<<32)|cell ; 
+      tracker++;
+      bytes_read=bytes_read+4;
+      a_c++;
+     }
+       
+     int s_c = 0 ;
+     while(s_c<size_cells)
+     {
+      uint32_t cell = __builtin_bswap32(*tracker) ; 
+      mmio_size = (mmio_size<<32)|cell ; 
+      tracker++;
+      bytes_read=bytes_read+4;
+      s_c++;
+     }
+
+     ic_node.mmio_base_size_array[ic_node.mmio_base_size_array_count] = mmio_base ; 
+     ic_node.mmio_base_size_array_count++;
+    ic_node.mmio_base_size_array[ic_node.mmio_base_size_array_count] = mmio_size ; 
+     ic_node.mmio_base_size_array_count++;
+
+  }
+
+
+    /*  Extracting Compatible Name and assigning correct  Ic Controller Code ! */
+
+     int i =0 ; 
+     while(ic_compatibles[i].compatible!=0&&ic_compatibles[i].ic_code!=0)
+     {
+      if(str_eq(ic_compatibles[i].compatible,compatible_buffer))
+      {
+          int len = 0 ;
+          while(compatible_buffer[len]!='\0')
+          {
+            len++;
+          }
+          len ++;
+          memcopy(ic_node.compatible,compatible_buffer,len);
+         ic_node.ic_code=ic_compatibles[i].ic_code ; 
+          break;
+      }
+      i++;
+     }
+
+     /*Extracting phandle Data ! */
+
+     tracker = (uint32_t*)interrupt_controller_buffer ; 
+     ic_node.phandle = __builtin_bswap32(*tracker);
+
+     /* Populating the out_info devices array and also the ic_indexes_array ! */
+
+   
+     ic_node.irq_cells_count=0;
+
+     /* ---- print ic_node before copy ---- */
+     uart_puts("\n===== IC NODE (pre-copy) =====\n");
+     uart_puts("  phandle    = ");
+     uart_puthex(ic_node.phandle);
+     uart_puts("\n");
+     uart_puts("  compatible = ");
+     uart_puts(ic_node.compatible);
+     uart_puts("\n");
+     uart_puts("  mmio_array_count = ");
+     uart_puthex(ic_node.mmio_base_size_array_count);
+     uart_puts("\n");
+     for (uint32_t p = 0; p + 1 < ic_node.mmio_base_size_array_count; p += 2) {
+         uart_puts("    base = ");
+         uart_puthex(ic_node.mmio_base_size_array[p]);
+         uart_puts("  size = ");
+         uart_puthex(ic_node.mmio_base_size_array[p + 1]);
+         uart_puts("\n");
+     }
+     uart_puts("  ic_code fn = ");
+     uart_puthex((uintptr_t)ic_node.ic_code);
+     uart_puts("\n");
+
+
+    memcopy( &out_info->devices[out_info->device_count]  , &ic_node , sizeof(struct device_entry));
+    ic_index_array[ic_index_array_count]=out_info->device_count ; 
+    out_info->device_count++;
+    ic_index_array_count++;
+
 }
-
-
-
