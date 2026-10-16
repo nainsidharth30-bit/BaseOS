@@ -82,11 +82,11 @@ void extract_ram_info(uint8_t* base_address , size_t len_to_read , uint32_t addr
 This function extracts IC Data 
 */
 
-void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_controller_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info );
+void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_controller_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info ,uint8_t* phandle_buffer );
 /*
 This Function extracts the  SSD devices Data  
 */
-void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells, const struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info );
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells, const struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info , uint8_t* phandle_buffer );
 
 
 
@@ -425,6 +425,9 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
 
              uint8_t* interrupt_controller_buffer = NULL;
              size_t interrupt_buffer_len = 0 ;
+
+             /* stores phandle of peripheral devices */
+             uint8_t* phandle_buffer = NULL ; 
              
             
 
@@ -469,6 +472,8 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
                   interrupt_controller_buffer = NULL;
              interrupt_buffer_len = 0 ;
              interrupt_controller_flag=0;
+
+             phandle_buffer=NULL;
 
           
              set_zero(&ssd_device_node,sizeof(struct device_entry));
@@ -578,8 +583,7 @@ If not → the node is something else (a device, a bus, memory, etc.)
       if(str_eq(prop_name,"phandle"))
       {
         phandle_flag=1;
-           interrupt_controller_buffer=one_byte_tracker_pointer;
-           interrupt_buffer_len = len ;
+           phandle_buffer=one_byte_tracker_pointer;
       }
 
 
@@ -706,9 +710,9 @@ It's a single phandle — a reference to the controller node. Without it, the ce
       */
 
 
-      if(ssd_node_flag&&compatible_flag&&reg_len&&interrupt_parent_len&&irq_line_len&&not_disabled_flag&&interrupt_cells_flag)
+      if(ssd_node_flag && compatible_flag && reg_len && irq_line_len && not_disabled_flag)
       {
-       extract_ssd_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ssd_compatibles,out_info);
+       extract_ssd_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ssd_compatibles,out_info,phandle_buffer);
       }
 
 
@@ -722,9 +726,9 @@ It's a single phandle — a reference to the controller node. Without it, the ce
       Extracting IC Controller Data ! 
       */
 
-      if(interrupt_controller_flag&&reg_len&&compatible_flag&&not_disabled_flag&&phandle_flag)
+      if(interrupt_controller_flag&&reg_len&&compatible_flag&&not_disabled_flag&&phandle_flag&&interrupt_cells_flag)
       {
-        extract_ic_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_controller_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ic_compatibles,out_info);
+        extract_ic_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ic_compatibles,out_info,phandle_buffer);
       }
 
 
@@ -763,6 +767,7 @@ It's a single phandle — a reference to the controller node. Without it, the ce
           interrupt_parent_buffer=NULL;
           interrupt_cells=0;
           interrupt_cells_flag=0;
+          phandle_buffer=NULL;
           
           compatible_buffer[0] = '\0'; 
           not_disabled_flag=1;
@@ -895,7 +900,7 @@ void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_t
 
 }
 
-void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const  struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info )
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const  struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info,uint8_t* phandle_buffer )
 {
     /*
     Extracting mmio base and mmio size first ! 
@@ -957,24 +962,30 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
      }
 
      /*
-     Extracting the phandle now , ouyt of interrupt-parent property ! 
+     Extracting the phandle now  ! 
      */
 
-     tracker = (uint32_t*)interrupt_parent_buffer ; 
+     tracker = (uint32_t*)phandle_buffer; 
 
      uint32_t phandle = __builtin_bswap32(*tracker) ; 
+     ssd_device_node.phandle=phandle;
+
+     tracker = (uint32_t*)interrupt_parent_buffer ;
+     phandle = __builtin_bswap32(*tracker) ; 
+     ssd_device_node.interrupt_controller_phandle=phandle;
+   
 
      /*Extracting irq line Data ! */
 
      tracker = (uint32_t*)irq_line_buffer ; 
      int i_c = 0 ; 
-     while(i_c!=interrupt_cells)
+     while(i_c!=irq_line_len)
      {
         uint32_t cell = __builtin_bswap32(*tracker);
         ssd_device_node.irq_cells[ssd_device_node.irq_cells_count] = cell; 
         tracker++;
         ssd_device_node.irq_cells_count ++ ;
-        i_c++;
+      i_c=i_c+4;
      }
 
      /*
@@ -1022,7 +1033,7 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
 }
 
 
-void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_controller_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info )
+void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const struct ic_compatible_entry ic_compatibles[], struct hardware_info* out_info,uint8_t* phandle_buffer )
 {
   /* Extracting MMIO Base and MMIO size Data ! */
 
@@ -1084,8 +1095,15 @@ void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* c
 
      /*Extracting phandle Data ! */
 
-     tracker = (uint32_t*)interrupt_controller_buffer ; 
-     ic_node.phandle = __builtin_bswap32(*tracker);
+tracker = (uint32_t*)phandle_buffer; 
+
+     uint32_t phandle = __builtin_bswap32(*tracker) ; 
+     ic_node.phandle=phandle;
+
+     tracker = (uint32_t*)interrupt_parent_buffer ;
+     phandle = __builtin_bswap32(*tracker) ; 
+     ic_node.interrupt_controller_phandle=phandle;
+   
 
      /* Populating the out_info devices array and also the ic_indexes_array ! */
 

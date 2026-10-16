@@ -4,7 +4,7 @@
 #define MAX_RESERVED_REGIONS 16  /* Maximum number of scattered reserved regions */
 #endif
 #include<stdint.h>
-#include"../driverHeaders/generic_struct_ssd.h"
+#include"../driverHeaders/peripheral_struct.h"
 #include"../interrupts/ic_bpt.h"
 #define MAX_INTERRUPT_CELLS 5
 #define MAX_DEVICES 32
@@ -18,13 +18,13 @@ struct reserved_region {
  struct device_entry{
     uint32_t phandle ;
     char compatible[100];
+    uint32_t interrupt_controller_phandle;
       uint64_t mmio_base_size_array[6]; 
       uint8_t mmio_base_size_array_count ; 
     uint32_t irq_cells[MAX_INTERRUPT_CELLS];
     uint32_t irq_cells_count;
-
     int (*ic_code)(struct ic_bpt* bpt);
-       int (*ssd_code)(struct ssd_request_bpt* bpt); 
+     int (*peripheral_code)(struct peripheral_request_bpt* bpt);
  };
 
  struct ic_compatible_entry {
@@ -34,7 +34,7 @@ struct reserved_region {
 
 struct ssd_compatible_entry{
    const char* compatible ; 
-   int (*ssd_code)(struct ssd_request_bpt* bpt);
+   int (*peripheral_code)(struct peripheral_request_bpt* bpt);
 };
 
 

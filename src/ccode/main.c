@@ -4,6 +4,8 @@
 #include "../../include/mkMAU/mkMAU.h"
 #include "../../include/driverHeaders/generic_struct_ssd.h"
 #include "../../include/interrupts/ic_bpt.h"
+#include"../../include/interrupts/enable_irq.h"
+#include"../../include/interrupts/devices_setup.h"
 
 
 struct hardware_info g_hw = {0} ;
@@ -44,9 +46,19 @@ void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
       
     extern char _kernel_start[];
     extern char _kernel_end[]; 
+
+
+    
     
       uintptr_t kernel_start = (uintptr_t)_kernel_start ;
     uintptr_t kernel_end = (uintptr_t)_kernel_end ;
+
+
+    extern uint16_t ssd_index_array[10];
+extern uint8_t  ssd_index_array_count;
+
+extern uint16_t ic_index_array[20];
+extern uint8_t  ic_index_array_count;
 
     uart_puts("\n Kernel Info \n");
     uart_puts("\n Kernel start == ");
@@ -74,7 +86,21 @@ void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
   {
     uart_puts("\n Its a BSP , extracting BSP info now !\n");
   }
-      
+
+
+  /* Initial Devices Setup  */
+
+  
+
+
+
+  uart_puts("Now enabling interrupts section ! ");
+
+
+  uart_puts("Enabling interrupts for SSD devices only ! ");
+
+
+      enable_irq_peripheral(&g_hw,ssd_index_array,ssd_index_array_count,ic_index_array,ic_index_array_count);
 
     uart_puts("\n Now we are entering in mkMAU main ! \n");
 
