@@ -3,9 +3,9 @@
 #include<stdint.h>
 #include<stddef.h>
 
-#include"include/driverHeaders/peripheral_struct.h"
+#include "peripheral_struct.h"
 
-int virtio_ssd_driver( struct ssd_request_bpt * bpt);
+int virtio_ssd_driver( struct peripheral_request_bpt * bpt);
 
 
 

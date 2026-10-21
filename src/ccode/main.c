@@ -2,7 +2,7 @@
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
 #include "../../include/mkMAU/mkMAU.h"
-#include "../../include/driverHeaders/generic_struct_ssd.h"
+#include "../../include/driverHeaders/peripheral_struct.h"
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
 #include"../../include/interrupts/devices_setup.h"
@@ -23,7 +23,7 @@ struct hardware_info g_hw = {0} ;
 
 
     /* Pointer function to the present SSD driver , we are bining it to correct SSD driver on run time ! */
-  //  int (*ssd_driver)(struct ssd_request_bpt* bpt)=0;
+  //  int (*ssd_driver)(struct peripheral_request_bpt* bpt)=0;
 
 
 
@@ -94,15 +94,13 @@ extern uint8_t  ic_index_array_count;
 
 
 
-  uart_puts("Now enabling interrupts section ! ");
+  /*
+    Step -- > 
 
+    Populate ic_code entry of peripheral devices , doing a lookup and checking if(interrupt-controller-phandle of peripheral == phanlde of interrupt controller) !
 
-  uart_puts("Enabling interrupts for SSD devices only ! ");
-
-
-      enable_irq_peripheral(&g_hw,ssd_index_array,ssd_index_array_count,ic_index_array,ic_index_array_count);
-
-    uart_puts("\n Now we are entering in mkMAU main ! \n");
+    
+  */
 
 
 

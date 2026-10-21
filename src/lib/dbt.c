@@ -8,7 +8,6 @@
 #include "../../include/lib/alignbyte.h"
 #include "../../include/driverHeaders/track_stack.h"
 #include "../../include/driverHeaders/queue_address.h"
-#include "../../include/driverHeaders/device_indexes.h"
 #include "../../include/lib/compare_start_address.h"
 #include "../../include/string_utility.h"
 #include "../../include/lib/memcpy.h"
@@ -197,8 +196,8 @@ for (uint32_t i = 0; i < ssd_index_array_count; i++) {
         uart_puts("\n");
     }
 
-    uart_puts("  ssd_code fn = ");
-    uart_puthex((uintptr_t)d->ssd_code);
+    uart_puts("  peripheral_code fn = ");
+    uart_puthex((uintptr_t)d->peripheral_code);
     uart_puts("\n");
 }
 
@@ -944,7 +943,7 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
      */
    
      int i = 0 ; 
-     while(ssd_compatibles[i].compatible!=0&&ssd_compatibles[i].ssd_code!=0)
+     while(ssd_compatibles[i].compatible!=0&&ssd_compatibles[i].peripheral_code!=0)
      {
       if(str_eq(ssd_compatibles[i].compatible,compatible_buffer))
       {
@@ -955,7 +954,7 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
         }
         len++;
         memcopy(ssd_device_node.compatible,compatible_buffer,len);
-        ssd_device_node.ssd_code=ssd_compatibles[i].ssd_code ; 
+        ssd_device_node.peripheral_code=ssd_compatibles[i].peripheral_code ; 
         break;
       }
       i++;
@@ -1020,8 +1019,8 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
          uart_puthex(ssd_device_node.irq_cells[c]);
          uart_puts("\n");
      }
-     uart_puts("  ssd_code fn = ");
-     uart_puthex((uintptr_t)ssd_device_node.ssd_code);
+     uart_puts("  peripheral_code fn = ");
+     uart_puthex((uintptr_t)ssd_device_node.peripheral_code);
      uart_puts("\n");
 
 

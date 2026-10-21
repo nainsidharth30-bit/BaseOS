@@ -5,7 +5,7 @@
 #include "../../include/mkMAU/mobilemkMAU.h"
 #include "../../include/mkMAU/mkmau_utils.h"
 #include "../../include/driverHeaders/track_stack.h"
-#include "../../include/driverHeaders/find_ssd_device.h"
+
 #include "../../include/lib/quicksort.h"
 #include "../../include/lib/compare_start_address.h"
 #include "../../include/interrupts/ic_bpt.h"

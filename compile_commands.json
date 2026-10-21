@@ -1,0 +1,122 @@
+[
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\string_utility.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\string_utility.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\ccode\\main.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\ccode\\main.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\ccode\\trampoline.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\ccode\\trampoline.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\ahci.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\ahci.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\find_ssd_device.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\find_ssd_device.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\queue_address.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\queue_address.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\stack_track.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\stack_track.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\uart.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\uart.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\VirtIO.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\driverCode\\VirtIO.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\arm_cortex_a15_gic.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\arm_cortex_a15_gic.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\arm_pl190_vic.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\arm_pl190_vic.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\devices_setup.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\devices_setup.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\enable_irq.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\interrupts\\enable_irq.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\alignbyte.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\alignbyte.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\compare_start_address.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\compare_start_address.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\dbt.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\dbt.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\dbt_weak.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\dbt_weak.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\memcpy.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\memcpy.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\quicksort.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\quicksort.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\setzero.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\lib\\setzero.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mkmau.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mkmau.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mkmau_utils.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mkmau_utils.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mobilemkMAU.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\mkMAU\\mobilemkMAU.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    },
+    {
+        "directory":  "C:\\Users\\sidharth\\dev\\BaseOS",
+        "file":  "C:\\Users\\sidharth\\dev\\BaseOS\\src\\process\\process.c",
+        "command":  "C:/arm-gnu-toolchain/bin/aarch64-none-elf-gcc.exe -c C:\\Users\\sidharth\\dev\\BaseOS\\src\\process\\process.c -Iinclude/driverHeaders -Iinclude/mkMAU -Iinclude/lib"
+    }
+]
