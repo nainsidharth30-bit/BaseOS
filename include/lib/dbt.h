@@ -18,11 +18,12 @@ struct reserved_region {
  struct device_entry{
     uint32_t phandle ;
     char compatible[100];
-    uint32_t interrupt_controller_phandle;
+    uint64_t interrupt_controller_phandle;
       uint64_t mmio_base_size_array[6]; 
       uint8_t mmio_base_size_array_count ; 
     uint32_t irq_cells[MAX_INTERRUPT_CELLS];
     uint32_t irq_cells_count;
+    uint32_t irq_priority ; 
     int (*ic_code)(struct ic_bpt* bpt);
      int (*peripheral_code)(struct peripheral_request_bpt* bpt);
  };

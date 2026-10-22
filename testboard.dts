@@ -1,36 +1,16 @@
 /dts-v1/;
 
-/* =========================================================================
- * BaseOS test board C: QEMU virt, cortex-a53, 512 MB, GICv2
- *
- * QEMU options:  -M virt -cpu cortex-a53 -smp 1 -m 512M
- *   one disk:    -drive if=none,file=build/ssd.img,format=raw,id=hd0
- *                -device virtio-blk-device,drive=hd0        (slot 0x0a003e00)
- *
- * Interrupt controllers (both enabled, neither has child nodes):
- *   gic  : arm,cortex-a15-gic   REAL      3 interrupt cells
- *   vic0 : arm,pl190-vic        FICTIONAL 1 interrupt cell, cascaded into gic
- *
- * Storage controllers (both enabled, different types, different parents):
- *   virtio_block@a003e00 : virtio,mmio   REAL       parent = vic0
- *   ahci@b020000         : generic-ahci  FICTIONAL  parent = gic
- *
- * Only virtio exists in QEMU. The kernel must NOT run an SSD driver for the
- * AHCI node; touching 0x0b020000 will fault. Driver selection by compatible
- * must skip any controller that has no registered driver.
- * ========================================================================= */
-
-/memreserve/ 0x0000000040000000 0x0000000000100000;  /* DTB + early boot */
-/memreserve/ 0x0000000040100000 0x0000000000100000;  /* TF-A BL31 */
-/memreserve/ 0x0000000040200000 0x0000000001000000;  /* OP-TEE */
+/memreserve/ 0x0000000040000000 0x0000000000100000;
+/memreserve/ 0x0000000040100000 0x0000000000100000;
+/memreserve/ 0x0000000040200000 0x0000000001000000;
 
 / {
     #address-cells = <2>;
     #size-cells = <2>;
-    model = "ARM Cortex-A53 Reference Platform C (two ICs, two SSD types)";
+    model = "ARM Cortex-A53 Reference Platform";
     compatible = "arm,cortex-a53-virt", "arm,vexpress";
 
-    interrupt-parent = <&gic>;
+    interrupt-parent = <&gic0>;
 
     cpus {
         #address-cells = <1>;
@@ -47,70 +27,57 @@
         reg = <0x00000000 0x40000000 0x00000000 0x20000000>;
     };
 
-    /* ---------------- INTERRUPT CONTROLLERS ---------------- */
-
-    /* IC 0: GICv2. reg[0] = GICD, reg[1] = GICC. 3 interrupt cells. */
-    gic: interrupt-controller@8000000 {
+    gic0: interrupt-controller@8000000 {
         compatible = "arm,cortex-a15-gic";
+        reg = <0x00000000 0x08000000 0x00000000 0x00010000>,
+              <0x00000000 0x08010000 0x00000000 0x00010000>;
+        interrupt-controller;
         #interrupt-cells = <3>;
-        interrupt-controller;
-        reg = <0x00000000 0x08000000 0x00000000 0x00010000>,   /* GICD */
-              <0x00000000 0x08010000 0x00000000 0x00010000>;   /* GICC */
     };
-
-    /* IC 1: PL190 VIC. 1 interrupt cell. Its single output line goes into
-     * the GIC as SPI 100 (interrupt-parent + interrupts below). */
-    vic0: interrupt-controller@b000000 {
-        compatible = "arm,pl190-vic";
-        reg = <0x00000000 0x0b000000 0x00000000 0x00001000>;
-        interrupt-controller;
-        #interrupt-cells = <1>;
-        interrupt-parent = <&gic>;
-        interrupts = <0 100 4>;
-    };
-
-    /* ---------------- OTHER PERIPHERALS ---------------- */
 
     timer {
         compatible = "arm,armv8-timer";
+        interrupt-parent = <&gic0>;
         interrupts = <1 13 0x104>,
                      <1 14 0x104>,
                      <1 11 0x104>,
                      <1 10 0x104>;
+        baseos,irq-priority = <0x40>;
         always-on;
     };
 
-    pl011@9000000 {                       /* console UART, SPI 1, REAL */
+    pl011@9000000 {
         compatible = "arm,pl011", "arm,primecell";
         reg = <0x00000000 0x09000000 0x00000000 0x00001000>;
+        interrupt-parent = <&gic0>;
         interrupts = <0 1 4>;
+        baseos,irq-priority = <0xC0>;
     };
 
-    rtc@9010000 {                         /* PL031 RTC, SPI 2, REAL */
+    rtc@9010000 {
         compatible = "arm,pl031", "arm,primecell";
         reg = <0x00000000 0x09010000 0x00000000 0x00001000>;
+        interrupt-parent = <&gic0>;
         interrupts = <0 2 4>;
+        baseos,irq-priority = <0xC0>;
     };
 
-    /* ---------------- STORAGE CONTROLLERS ---------------- */
-
-    /* SSD A: virtio-mmio block, parent = VIC (1 cell), REAL */
     virtio_block@a003e00 {
         compatible = "virtio,mmio";
         reg = <0x00000000 0x0a003e00 0x00000000 0x00000200>;
-        interrupt-parent = <&vic0>;
-        interrupts = <3>;
+        interrupt-parent = <&gic0>;
+        interrupts = <0 47 1>;
+        baseos,irq-priority = <0x80>;
     };
 
-    /* SSD B: AHCI SATA controller, parent = GIC (3 cells), FICTIONAL */
     ahci@b020000 {
         compatible = "generic-ahci";
         reg = <0x00000000 0x0b020000 0x00000000 0x00001000>;
-        interrupt-parent = <&gic>;
+        interrupt-parent = <&gic0>;
         interrupts = <0 102 4>;
+        baseos,irq-priority = <0xA0>;
     };
 
-    /* ---------------- RESERVED MEMORY ---------------- */
     reserved-memory {
         #address-cells = <2>;
         #size-cells = <2>;

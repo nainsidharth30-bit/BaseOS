@@ -5,11 +5,8 @@
 #include<stdint.h>
 #include"ic_bpt.h"
 
-struct index_arrays {
-   uint16_t idx_array[20];
-   uint8_t  count ; 
-} ; 
+ 
 
-void devices_setup(struct hardware_info* out_info , struct index_arrays * arr  );
+void devices_setup(struct hardware_info* out_info , uint16_t * peripheral_index_array , uint8_t peripheral_index_array_count , uint16_t* ic_index_array , uint8_t ic_index_array_count );
 
 #endif

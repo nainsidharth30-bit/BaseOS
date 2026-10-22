@@ -1,7 +1,7 @@
 #ifndef IC_BPT_H
 #define IC_BPT_H
 #include<stdint.h>
-#define MAX_PAIRS 20
+#define MAX_PAIRS 6
 #define MAX_CELLS 5 
 
 struct ic_bpt{
@@ -12,6 +12,8 @@ struct ic_bpt{
     uint32_t total_number_of_elemnets ; // Its is total number of elemnets not pairs 
     uint32_t irq_cells[MAX_CELLS];
     uint32_t number_of_irq_cells ; 
+    uint32_t operation_code ; // 0 --> Return  , 1 -- > Enable the IRQ Line 
+    uint32_t priority_value ; 
 } ; 
 
 #endif

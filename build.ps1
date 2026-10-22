@@ -93,7 +93,8 @@ $sources = @(
      "src/interrupts/arm_cortex_a15_gic.c",
      "src/interrupts/arm_pl190_vic.c",
      "src/driverCode/ahci.c",
-     "src/interrupts/enable_irq.c"
+     "src/interrupts/enable_irq.c",
+     "src/interrupts/devices_setup.c"
 )
 
 Write-Host "Compiling..." -ForegroundColor Cyan

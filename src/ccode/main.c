@@ -6,6 +6,8 @@
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
 #include"../../include/interrupts/devices_setup.h"
+#include"../lib/memcpy.h"
+#include"../lib/setzero.h"
 
 
 struct hardware_info g_hw = {0} ;
@@ -54,11 +56,7 @@ void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
     uintptr_t kernel_end = (uintptr_t)_kernel_end ;
 
 
-    extern uint16_t ssd_index_array[10];
-extern uint8_t  ssd_index_array_count;
 
-extern uint16_t ic_index_array[20];
-extern uint8_t  ic_index_array_count;
 
     uart_puts("\n Kernel Info \n");
     uart_puts("\n Kernel start == ");
@@ -98,9 +96,67 @@ extern uint8_t  ic_index_array_count;
     Step -- > 
 
     Populate ic_code entry of peripheral devices , doing a lookup and checking if(interrupt-controller-phandle of peripheral == phanlde of interrupt controller) !
-
+    In devices_setup.c ! 
     
   */
+
+      extern uint16_t ssd_index_array[10];
+extern uint8_t  ssd_index_array_count;
+
+extern uint16_t ic_index_array[20];
+extern uint8_t  ic_index_array_count;
+
+devices_setup(&g_hw , ssd_index_array , ssd_index_array_count , ic_index_array , ic_index_array_count);
+
+
+
+/* Step -->       DONE ! */
+
+
+/* DECISION -- > First , We will turn on the irq line of SSD Controller only because it needs to fetch extensions binary from SSD to RAM ! */
+
+
+/* Step -- >  
+Now calling ic_code from peripheral_devices(SSD Controller) to turn their irq line on ! 
+*/
+
+ struct ic_bpt ic_bpt_node;
+set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
+  uart_puts("\n H1 \n");
+
+  struct device_entry* ic_ptr = NULL ;
+   uart_puts("\n H2 \n");
+
+ for(int i =0 ; i<ssd_index_array_count ; i++)
+ {
+  
+
+  ic_ptr =( struct device_entry*)g_hw.devices[ssd_index_array[i]].interrupt_controller_phandle ; 
+
+
+     memcopy(ic_bpt_node.mmio_base_mmio_size_pair_array , ic_ptr->mmio_base_size_array , sizeof(ic_ptr->mmio_base_size_array) );
+     memcopy(ic_bpt_node.irq_cells, g_hw.devices[ssd_index_array[i]].irq_cells , sizeof(g_hw.devices[ssd_index_array[i]].irq_cells) );
+
+
+     ic_bpt_node.total_number_of_elemnets = ic_ptr->mmio_base_size_array_count ; 
+     ic_bpt_node.number_of_irq_cells = g_hw.devices[ssd_index_array[i]].irq_cells_count ; 
+
+     ic_bpt_node.operation_code = 1 ; // We want to enable the irq line ! 
+     ic_bpt_node.priority_value = g_hw.devices[ssd_index_array[i]].irq_priority ; 
+     
+
+     ic_ptr->ic_code(&ic_bpt_node);
+   
+     
+      set_zero(&ic_bpt_node , sizeof(struct ic_bpt));
+     
+       ic_ptr=NULL;
+   
+ }
+
+
+
+/* Step --> Done ! */
 
 
 
