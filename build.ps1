@@ -71,7 +71,12 @@ Run $dtc @("-I", "dts", "-O", "dtb", "-o", "build/test_board.dtb", "testboard.dt
 # 2. Compile sources
 #    To add a new C file, add it to this list. Order = link order.
 # ---------------------------------------------------------------
-$includes = @("-Iinclude/driverHeaders", "-Iinclude/mkMAU", "-Iinclude/lib")
+$includes = @(
+    "-Iinclude/driverHeaders", 
+    "-Iinclude/mkMAU", 
+    "-Iinclude/lib",
+    "-Iinclude/interrupts"
+)
 
 $sources = @(
     "src/string_utility.c",
@@ -79,22 +84,21 @@ $sources = @(
     "src/ccode/trampoline.c",
     "src/driverCode/uart.c",
     "src/driverCode/stack_track.c",
-     "src/driverCode/queue_address.c",
     "src/mkMAU/mkmau.c",
     "src/mkMAU/mkmau_utils.c",
     "src/mkMAU/mobilemkMAU.c",
     "src/lib/dbt.c",
-     "src/lib/memcpy.c",
+    "src/lib/memcpy.c",
     "src/lib/alignbyte.c",
     "src/lib/setzero.c",
     "src/lib/quicksort.c",
     "src/driverCode/virtIO.c",
-     "src/lib/compare_start_address.c",
-     "src/interrupts/arm_cortex_a15_gic.c",
-     "src/interrupts/arm_pl190_vic.c",
-     "src/driverCode/ahci.c",
-     "src/interrupts/enable_irq.c",
-     "src/interrupts/devices_setup.c"
+    "src/lib/compare_start_address.c",
+    "src/interrupts/arm_cortex_a15_gic.c",
+    "src/interrupts/arm_pl190_vic.c",
+    "src/driverCode/ahci.c",
+    "src/interrupts/enable_irq.c",
+    "src/interrupts/devices_setup.c"
 )
 
 Write-Host "Compiling..." -ForegroundColor Cyan
@@ -125,13 +129,6 @@ Write-Host "Image built at $($img.LastWriteTime)  ($($img.Length) bytes)" -Foreg
 
 # ---------------------------------------------------------------
 # 4. Virtual SSD with extensions (512-byte sectors)
-#
-# This step only COPIES ready-made .bin files into the disk image.
-# It does not build extensions. Put the real files in the project
-# root (next to build.ps1) as first_extension.bin / second_extension.bin.
-#
-# If a file is missing, a PLACEHOLDER with a recognisable text pattern
-# is used instead, so you can still test reading from the disk.
 # ---------------------------------------------------------------
 Write-Host "Creating virtual SSD..." -ForegroundColor Cyan
 
@@ -140,7 +137,7 @@ $fs = [System.IO.File]::Open($ssdPath, [System.IO.FileMode]::Create)
 $fs.SetLength(10MB)
 $fs.Close()
 
-# 1024 bytes (= 2 sectors) of repeating text, e.g. "BASEOS-PLACEHOLDER-FIRST BASEOS-PLACEHOLDER-FIRST ..."
+# 1024 bytes (= 2 sectors) of repeating text
 function New-PlaceholderExtension {
     param([string]$Path, [string]$Label)
     $pattern = [System.Text.Encoding]::ASCII.GetBytes("BASEOS-PLACEHOLDER-$Label ")

@@ -24,6 +24,7 @@ struct reserved_region {
     uint32_t irq_cells[MAX_INTERRUPT_CELLS];
     uint32_t irq_cells_count;
     uint32_t irq_priority ; 
+    uint32_t queue_num ; 
     int (*ic_code)(struct ic_bpt* bpt);
      int (*peripheral_code)(struct peripheral_request_bpt* bpt);
  };

@@ -68,6 +68,7 @@
         interrupt-parent = <&gic0>;
         interrupts = <0 47 1>;
         baseos,irq-priority = <0x80>;
+        baseos,num-queue = <1> ; 
     };
 
     ahci@b020000 {

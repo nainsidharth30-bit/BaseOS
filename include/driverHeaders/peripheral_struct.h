@@ -11,8 +11,14 @@ struct peripheral_request_bpt {
      uint32_t size_of_qaa ; 
      uintptr_t buffer_addresses_array[5] ; //baa
      uint32_t size_of_baa ; 
+
+     /*
+      IN Case of SSD Controller --> First 8 bits tells if it is a read (1) or write(0) operation ! 
+     
+     */
   
-     uint64_t operation_data_array[20] ; 
+   uint8_t   operation_data_array[20] ; 
+   uint8_t setup_flag ; 
      
 };
 

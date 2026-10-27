@@ -12,26 +12,6 @@
 
 struct hardware_info g_hw = {0} ;
 
-/* Stores the maximum Queue size for the SSD controller Queue*/
- uint32_t max_queue_size = -1 ; 
-/* stores the address of the Queue used by SSD controller */
- uintptr_t ssd_queue_address = 0 ;
- 
- /* Stores the Address of the buffer which is used by SSD controller for DMA */
- void * kernel_buffer_address = 0 ;
-
- /* Gives the sector size in SSD , Size of kernel buffer is equal to SSD Sector size */
- uint32_t ssd_sector_size = 0 ;
-
-
-    /* Pointer function to the present SSD driver , we are bining it to correct SSD driver on run time ! */
-  //  int (*ssd_driver)(struct peripheral_request_bpt* bpt)=0;
-
-
-
-
-
-
 
 
 
@@ -157,6 +137,13 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
 
 /* Step --> Done ! */
+
+
+/*
+Step -- > 
+
+
+*/
 
 
 
