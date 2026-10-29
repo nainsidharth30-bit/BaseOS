@@ -1,29 +1,45 @@
-#ifndef META-EXT_H
-#define META-EXT_H
+#ifndef META_EXT_H
+#define META_EXT_H
 #include<stdint.h>
 #include<stddef.h>
 
-struct meta_ext {
-    const char* name ;
-    uint32_t ssd_sectore_address ;
-    uint32_t size_in_bytes ;
-    
-} ;
+ struct meta_ext{
 
-struct meta_ext available_extensions_array []={
-    {
-       .name = "first_extension",
-        .ssd_sectore_address = 1024,
-        .size_in_bytes = 4096,
-    },
-    {
-        .name = "second_extension",
-        .ssd_sectore_address = 2048,
-        .size_in_bytes = 4096
-    }
-} ;
+    const char extension_name[64] ; 
+    /*
+    The value extension type tells about the main work or say type of extension like if the extension is a virtual machine or a driver ! 
+     1 -- > Driver , 2 -- > Virtual Machine and so on , we can decide that thing later as we proceed further in our work ! 
+    */
+    uint32_t extension_type ; 
 
-const int extension_count = sizeof(available_extensions_array) / sizeof(available_extensions_array[0]);
+    /* Tells if the extension should be loaded automatically at boot or not ! 0 --> no , 1 --> Yes !*/
+
+    uint8_t load_at_boot_extension ; 
+
+    /*
+    Gives the sector number where the extension is actually present ! 
+    */
+
+    uint64_t sector_number ; 
+    /* Sector offset for placement of extension inside the sector ! */
+    uint32_t byte_offset ; 
+
+    /* Size of extension in bytes !*/
+
+    uint32_t size_of_extension ; 
+
+    /*
+    The controller it belongs to !
+    */
+
+    uint32_t uniq_id  ; 
+
+    /* 
+ we can add more properties later based on requirement !
+*/
+
+
+ } ; 
 
 
 

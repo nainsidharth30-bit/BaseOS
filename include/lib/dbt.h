@@ -25,6 +25,7 @@ struct reserved_region {
     uint32_t irq_cells_count;
     uint32_t irq_priority ; 
     uint32_t queue_num ; 
+    uint32_t uniq_id ; 
     int (*ic_code)(struct ic_bpt* bpt);
      int (*peripheral_code)(struct peripheral_request_bpt* bpt);
  };
@@ -53,6 +54,10 @@ struct hardware_info {
     struct device_entry devices[MAX_DEVICES];
     uint32_t device_count ;   // it works more like a index rather than size , for size do device_count+1 
 
+    uint32_t mem_sec ;  // 0 --> None  , 1 --> MPU , 2--> MMU ! 
+
+    uint32_t ssd_controller_extensions_uniq_id_array[10] ; 
+    uint32_t ssd_controller_extensions_mapped_sector_array[25] ; 
 
      };
 

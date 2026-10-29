@@ -10,6 +10,24 @@
     model = "ARM Cortex-A53 Reference Platform";
     compatible = "arm,cortex-a53-virt", "arm,vexpress";
 
+    baseos,mem-sec = <2>  ; /* 0=none , 1 = MPU , 2=MMU */ 
+
+/*
+  This property stores the ssd controller whose storgae device stores the extensions meta Data ! 
+  The value 1 here is the uniq-id value of the ssd controller 
+  the value -1(0xFFFFFFFF) here is the delimiter which tells the end of some uniq-id and starting of some new uniq-id 
+  and the value -2(0xFFFFFFFE) represents the end of the block ! 
+*/
+    baseos,ssd-controller-extensions-uniq-id = < 0xFFFFFFFF 0x00000001 0xFFFFFFFE > ;
+
+    /*
+    Stores the sector numbers in sequential order where the metadata of the extensions is placed , the sectors will be read in strict sequential order so it is the user work to give proper dtb 
+      the value -1 here is the delimiter which tells the end!
+  and the value -2 represents the end of the block ! 
+    */
+
+    baseos,sector-number-extensions = < 0xFFFFFFFF 1 0xFFFFFFFE> ;
+
     interrupt-parent = <&gic0>;
 
     cpus {
@@ -69,6 +87,7 @@
         interrupts = <0 47 1>;
         baseos,irq-priority = <0x80>;
         baseos,num-queue = <1> ; 
+        baseos,uniq-id = <1> ; 
     };
 
     ahci@b020000 {
@@ -76,7 +95,9 @@
         reg = <0x00000000 0x0b020000 0x00000000 0x00001000>;
         interrupt-parent = <&gic0>;
         interrupts = <0 102 4>;
+        status = "disabled" ; 
         baseos,irq-priority = <0xA0>;
+        baseos,uniq-id = <2> ; 
     };
 
     reserved-memory {

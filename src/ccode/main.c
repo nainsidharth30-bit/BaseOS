@@ -59,6 +59,7 @@ void bkernel_main(uintptr_t x0_register , uint64_t x1_register )
      uart_puts(" \n It is a dtb , extracting information !  \n");
       extracting_dbt_info(x0_register  , &g_hw) ; 
     uart_puts("\nI am outsiude dtb \n");
+    uart_puthex(g_hw.mem_sec);
   }
   else
   {
@@ -97,7 +98,7 @@ devices_setup(&g_hw , ssd_index_array , ssd_index_array_count , ic_index_array ,
 
 
 /* Step -- >  
-Now calling ic_code from peripheral_devices(SSD Controller) to turn their irq line on ! 
+Now calling ic_code from peripheral_devices(SSD Controller) to turn their irq line on  or enabling Interrupt Lines  ! 
 */
 
  struct ic_bpt ic_bpt_node;
@@ -139,17 +140,6 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 /* Step --> Done ! */
 
 
-/*
-Step -- > 
-
-
-*/
-
-
-
-
-
-
        /*  
    ARCHITECTURAL DECISION ----->
          The memory which is used by the kernel ( like reserved regions , buffers , SSD Queue , Kernel itself) 
@@ -165,6 +155,26 @@ Step -- >
    */
       
        mkMAU_main(&g_hw, x1_register) ;
+ 
+
+       /*
+         Step -- > 
+         Check if it is MMU , MPU or None ! 
+       */
+
+       if(g_hw.mem_sec==2)
+       {
+        uart_puts("Its MMU ! DO Paging ");
+           
+       }
+       else if(g_hw.mem_sec==1)
+       {
+        uart_puts("Its MPU ! ") ; 
+       }
+       else
+       {
+        uart_puts("Its None ! ") ; 
+       }
       
     
     

@@ -2,6 +2,7 @@
 #include "../../include/lib/dbt.h"
 #include "../../include/lib/quicksort.h"
 #include "../../include/lib/setzero.h"
+#include "../../include/lib/memcpy.h"
 #include "../../include/mkMAU/mkMAU.h"
 #include<string.h>
 #include "../../include/driverHeaders/uart.h"
@@ -10,7 +11,7 @@
 #include "../../include/driverHeaders/queue_address.h"
 #include "../../include/lib/compare_start_address.h"
 #include "../../include/string_utility.h"
-#include "../../include/lib/memcpy.h"
+
 
 #include"../interrupts/arm_cortex_a15_gic.h"
 #include"../interrupts/arm_pl190_vic.h"
@@ -49,11 +50,31 @@ padding-------->4 bytes aligned padding !
 */
 #define FDT_NOP         0x00000004  //Do nothing ,  Skip 
 #define FDT_END         0x00000009  // End of the structure block
+
+/*
+this function extracts the ssd controllers uniq id and mapped sectors where the extension metadat is present ! 
+*/
+
+
+void extract_extensions_metadata_controllers_uniq_ids(struct hardware_info* out_info,
+                                                      uint8_t* ssd_controller_uniq_id_buffer,
+                                                      uint32_t len_uniq_id_buffer) ; 
+
+                                                       void extract_extensions_metadata_mapped_sectors(struct hardware_info* out_info,
+                                                uint8_t* ssd_controller_mapped_sectors_buffer,
+                                                uint32_t len_mapped_sectors_buffer) ; 
+
+
 /*
 This function extract those reserved regions which are present inside the structure_block of dtb 
 */
 void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_to_read , struct hardware_info* out_info,uint32_t address_cells ,uint32_t size_cells);
 
+/*
+This function extracts the mem_sec value which tells if the chip has mpu , mmu or none 
+*/
+
+void extract_mem_sec_value(uint8_t* mem_sec_buffer , struct hardware_info* out_info) ; 
 
 /*
 To get the total size of the tree 
@@ -81,7 +102,7 @@ void extract_ic_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* c
 /*
 This Function extracts the  SSD devices Data  
 */
-void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells, const struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info , uint8_t* phandle_buffer , uint8_t* priority_buffer ,  uint8_t* queue_num_buffer );
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells, const struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info , uint8_t* phandle_buffer , uint8_t* priority_buffer ,  uint8_t* queue_num_buffer , uint8_t* uniq_id_buffer  );
 
 
 
@@ -351,6 +372,12 @@ Where it appears: on the interrupt controller node — the node that will interp
        int reserved_regions_depth = -1;
        int depth =0 ;
 
+       // Extern Variables from Main  !   //
+
+       
+
+       // Extern Variables from Main  End !//
+
        
 
 
@@ -388,6 +415,8 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
      
          uint8_t compatible_flag =0;
 
+         uint8_t uniq_id_flag = 0 ; 
+
          uint8_t interrupt_cells_flag=0;
         
          uint8_t interrupt_controller_flag = 0 ; 
@@ -398,6 +427,9 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
 
         uint8_t priority_flag = 0 ; 
         uint8_t block_devices_queue_flag = 0 ; 
+
+   
+
 
 
        //----------- FLAG SECTION OVER ---------------//
@@ -417,6 +449,8 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
            
              char compatible_buffer[40] = ""; 
 
+             uint8_t * uniq_id_buffer = NULL ; 
+
              /* Stores the value of the phandle ! */
 
              uint8_t* interrupt_controller_buffer = NULL;
@@ -427,7 +461,9 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
              
              uint8_t* priority_buffer = NULL ; 
              uint8_t * block_device_queue_buffer = NULL ; 
+
             
+           
 
 
 
@@ -462,6 +498,8 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
           irq_line_buffer=NULL;
           irq_line_len=0;
           compatible_buffer[0] = '\0'; 
+          uniq_id_buffer=NULL;
+          uniq_id_flag=0 ; 
           phandle_flag=0;
           not_disabled_flag=1;
           interrupt_cells=0;
@@ -478,6 +516,12 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
 
              block_device_queue_buffer=NULL;
              block_devices_queue_flag = 0 ; 
+
+         
+
+      
+
+           
 
           
              set_zero(&ssd_device_node,sizeof(struct device_entry));
@@ -591,6 +635,45 @@ If not → the node is something else (a device, a bus, memory, etc.)
   block_devices_queue_flag = 1 ; 
   block_device_queue_buffer = one_byte_tracker_pointer ; 
  }
+
+
+ if(str_eq(prop_name , "baseos,mem-sec"))
+ {
+   extract_mem_sec_value(one_byte_tracker_pointer , out_info);
+ }
+
+
+ if(str_eq(prop_name , "baseos,ssd-controller-extensions-uniq-id"))
+ {  uart_puts("\nI am runing , unique id  \n");
+
+
+   
+    extract_extensions_metadata_controllers_uniq_ids(
+        out_info,
+        one_byte_tracker_pointer,
+        len);
+
+    
+ }
+
+ if(str_eq(prop_name , "baseos,sector-number-extensions"))
+ {
+  uart_puts("\nI am runing  , mapped sectorsd \n");
+
+   
+    extract_extensions_metadata_mapped_sectors(
+        out_info,
+        one_byte_tracker_pointer,
+        len );
+ }
+
+ if(str_eq(prop_name,"baseos,uniq-id"))
+ {
+  uniq_id_flag=1 ; 
+  uniq_id_buffer=one_byte_tracker_pointer ; 
+ }
+
+
 
 
       
@@ -727,9 +810,9 @@ It's a single phandle — a reference to the controller node. Without it, the ce
       */
 
 
-      if(ssd_node_flag && compatible_flag && reg_len && irq_line_len && not_disabled_flag&&block_devices_queue_flag)
+      if(ssd_node_flag && compatible_flag && reg_len && irq_line_len && not_disabled_flag&&block_devices_queue_flag&&uniq_id_flag)
       {
-       extract_ssd_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ssd_compatibles,out_info,phandle_buffer , priority_buffer , block_device_queue_buffer);
+       extract_ssd_devices_data(reg_buffer,reg_len,compatible_buffer,irq_line_buffer,irq_line_len,interrupt_parent_buffer,interrupt_parent_len,address_cells,size_cells,interrupt_cells,ssd_compatibles,out_info,phandle_buffer , priority_buffer , block_device_queue_buffer , uniq_id_buffer);
       }
 
 
@@ -738,6 +821,7 @@ It's a single phandle — a reference to the controller node. Without it, the ce
       Extracting SSD Controller Data Over ! 
       */
 
+   
 
       /*
       Extracting IC Controller Data ! 
@@ -758,7 +842,7 @@ It's a single phandle — a reference to the controller node. Without it, the ce
         extract_reserved_regions_from_dt_struct(reg_buffer, reg_len,out_info,address_cells,size_cells);
       }
 
-
+     
     
  
 
@@ -791,6 +875,7 @@ It's a single phandle — a reference to the controller node. Without it, the ce
 
                    block_device_queue_buffer=NULL;
              block_devices_queue_flag = 0 ;
+
 
              set_zero(&ssd_device_node,sizeof(struct device_entry));
              set_zero(&ic_node,sizeof(struct device_entry));
@@ -920,7 +1005,7 @@ void extract_reserved_regions_from_dt_struct(uint8_t* base_address ,size_t len_t
 
 }
 
-void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const  struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info,uint8_t* phandle_buffer , uint8_t* priority_buffer , uint8_t* queue_num_buffer )
+void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* compatible_buffer , uint8_t* irq_line_buffer , uint8_t irq_line_len , uint8_t* interrupt_parent_buffer ,uint16_t interrupt_parent_len , uint32_t address_cells , uint32_t size_cells , uint32_t interrupt_cells ,const  struct ssd_compatible_entry ssd_compatibles[] , struct hardware_info* out_info,uint8_t* phandle_buffer , uint8_t* priority_buffer , uint8_t* queue_num_buffer, uint8_t* uniq_id_buffer   )
 {
     /*
     Extracting mmio base and mmio size first ! 
@@ -1022,6 +1107,15 @@ void extract_ssd_devices_data(uint8_t* reg_buffer , uint16_t reg_len , uint8_t* 
    ssd_device_node.queue_num = __builtin_bswap32(*(uint32_t*)queue_num_buffer);
       uart_puts("==========================\n");
      uart_puthex(ssd_device_node.queue_num);
+  uart_puts("==========================\n");
+
+  /*
+  Extracting the uniq_id value ! 
+  */
+
+  ssd_device_node.uniq_id = __builtin_bswap32(*(uint32_t*)uniq_id_buffer);
+      uart_puts("==========RARARARARARARARA================\n");
+     uart_puthex(ssd_device_node.uniq_id);
   uart_puts("==========================\n");
 
      /*
@@ -1143,4 +1237,50 @@ tracker = (uint32_t*)phandle_buffer;
     out_info->device_count++;
     ic_index_array_count++;
 
+}
+
+void extract_mem_sec_value(uint8_t* mem_sec_buffer , struct hardware_info* out_info)
+{
+   uint32_t value = __builtin_bswap32(*(uint32_t*)mem_sec_buffer);
+  out_info->mem_sec = value; 
+}
+
+
+void extract_extensions_metadata_mapped_sectors(struct hardware_info* out_info,
+                                                uint8_t* ssd_controller_mapped_sectors_buffer,
+                                                uint32_t len_mapped_sectors_buffer)
+{
+    uint32_t *tracker = (uint32_t*)ssd_controller_mapped_sectors_buffer;
+
+    uint32_t len_end = 0;
+    uint32_t i = 0;
+
+    while (len_end < len_mapped_sectors_buffer)
+    {
+        uint32_t value = __builtin_bswap32(*tracker);
+        out_info->ssd_controller_extensions_mapped_sector_array[i] = value;
+        i++;
+        len_end = len_end + 4;
+        tracker++;
+    }
+}
+
+
+void extract_extensions_metadata_controllers_uniq_ids(struct hardware_info* out_info,
+                                                      uint8_t* ssd_controller_uniq_id_buffer,
+                                                      uint32_t len_uniq_id_buffer)
+{
+    uint32_t *tracker = (uint32_t*)ssd_controller_uniq_id_buffer;
+
+    uint32_t len_end = 0;
+    uint32_t i = 0;
+
+    while (len_end < len_uniq_id_buffer)
+    {
+        uint32_t value = __builtin_bswap32(*tracker);
+        out_info->ssd_controller_extensions_uniq_id_array[i] = value;
+        i++;
+        len_end = len_end + 4;
+        tracker++;
+    }
 }

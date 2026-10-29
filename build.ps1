@@ -129,13 +129,36 @@ Write-Host "Image built at $($img.LastWriteTime)  ($($img.Length) bytes)" -Foreg
 
 # ---------------------------------------------------------------
 # 4. Virtual SSD with extensions (512-byte sectors)
+#
+#    Layout rules (must match the C-side meta_ext parser exactly):
+#
+#    Sector 1 (base sector, from DTB: baseos,sector-number-extensions = <1>)
+#      offset 0   : next_sector_number (uint64, LE) = 0xFFFFFFFFFFFFFFFF -> no more sectors
+#      offset 8   : 24 bytes reserved, zero-filled
+#      offset 32  : meta_ext entry[0]  (first_extension)
+#      offset 121 : meta_ext entry[1]  (second_extension)
+#      offset 210 : sentinel meta_ext entry, uniq_id = 0xFFFFFFFF -> "no more entries"
+#      rest       : zero-filled up to 512
+#
+#    meta_ext on-disk layout (PACKED, 89 bytes total -- the C struct
+#    MUST be declared __attribute__((packed)) or offsets will not match):
+#      [0 .. 63]   extension_name   (64 bytes, ASCII, zero-padded)
+#      [64.. 67]   extension_type   (uint32, LE)
+#      [68]        load_at_boot_extension (uint8)
+#      [69..76]    sector_number    (uint64, LE)  -- where the extension's raw bytes start
+#      [77..80]    byte_offset      (uint32, LE)  -- always 0 for now
+#      [81..84]    size_of_extension(uint32, LE)
+#      [85..88]    uniq_id          (uint32, LE)  -- which SSD controller this belongs to
 # ---------------------------------------------------------------
+
 Write-Host "Creating virtual SSD..." -ForegroundColor Cyan
 
 $ssdPath = "build/ssd.img"
 $fs = [System.IO.File]::Open($ssdPath, [System.IO.FileMode]::Create)
 $fs.SetLength(10MB)
 $fs.Close()
+
+$SECTOR_SIZE = 512
 
 # 1024 bytes (= 2 sectors) of repeating text
 function New-PlaceholderExtension {
@@ -163,10 +186,92 @@ function Write-ExtensionToSector {
     $stream.Write($binBytes, 0, $binBytes.Length)
     $stream.Close()
     Write-Host "  Flashed $source ($($binBytes.Length) bytes) to sector $SectorIndex (offset $offset)" -ForegroundColor Green
+    return $binBytes.Length
 }
 
-Write-ExtensionToSector "first_extension.bin"  "first"  $ssdPath 512 1024
-Write-ExtensionToSector "second_extension.bin" "second" $ssdPath 512 2048
+# ---------------------------------------------------------------
+# 4a. Flash the two actual extensions to their data sectors
+# ---------------------------------------------------------------
+$firstSector  = 1024
+$secondSector = 2048
+
+$firstSize  = Write-ExtensionToSector "first_extension.bin"  "first"  $ssdPath $SECTOR_SIZE $firstSector
+$secondSize = Write-ExtensionToSector "second_extension.bin" "second" $ssdPath $SECTOR_SIZE $secondSector
+
+# ---------------------------------------------------------------
+# 4b. Build one packed meta_ext entry (89 bytes) as raw bytes
+# ---------------------------------------------------------------
+function New-MetaExtEntry {
+    param(
+        [string]$Name,
+        [uint32]$Type,
+        [byte]$LoadAtBoot,
+        [uint64]$SectorNumber,
+        [uint32]$ByteOffset,
+        [uint32]$SizeOfExtension,
+        [uint32]$UniqId
+    )
+
+    $buf = New-Object byte[] 89
+
+    # extension_name[64], ASCII, zero-padded, truncated if too long
+    $nameBytes = [System.Text.Encoding]::ASCII.GetBytes($Name)
+    $copyLen   = [Math]::Min($nameBytes.Length, 63)   # leave room for null terminator
+    [Array]::Copy($nameBytes, 0, $buf, 0, $copyLen)
+    # remaining bytes in [0..63] are already 0 from New-Object byte[]
+
+    [Array]::Copy([BitConverter]::GetBytes($Type),            0, $buf, 64, 4)
+    $buf[68] = $LoadAtBoot
+    [Array]::Copy([BitConverter]::GetBytes($SectorNumber),    0, $buf, 69, 8)
+    [Array]::Copy([BitConverter]::GetBytes($ByteOffset),      0, $buf, 77, 4)
+    [Array]::Copy([BitConverter]::GetBytes($SizeOfExtension), 0, $buf, 81, 4)
+    [Array]::Copy([BitConverter]::GetBytes($UniqId),          0, $buf, 85, 4)
+
+    return $buf
+}
+
+# extension_type: 1 = Driver (per your own convention). Adjust per-extension if needed.
+# load_at_boot:   1 = yes, autoload at boot.
+# uniq_id:        1  (matches DTB: baseos,uniq-id = <1> on the virtio_block node)
+
+$entry0 = New-MetaExtEntry -Name "first_extension"  -Type 1 -LoadAtBoot 1 `
+            -SectorNumber $firstSector  -ByteOffset 0 -SizeOfExtension $firstSize  -UniqId 1
+
+$entry1 = New-MetaExtEntry -Name "second_extension" -Type 1 -LoadAtBoot 0 `
+            -SectorNumber $secondSector -ByteOffset 0 -SizeOfExtension $secondSize -UniqId 1
+
+# Sentinel entry: uniq_id = 0xFFFFFFFF marks "no more entries in this sector"
+# NOTE: on Windows PowerShell 5.1, the hex literal 0xFFFFFFFF is parsed as a
+# signed Int32 and wraps to -1, which then fails to cast into [uint32]. Using
+# [uint32]::MaxValue avoids that entirely and is unambiguous in any PS version.
+$sentinel = New-MetaExtEntry -Name "" -Type 0 -LoadAtBoot 0 `
+            -SectorNumber 0 -ByteOffset 0 -SizeOfExtension 0 -UniqId ([uint32]::MaxValue)
+
+# ---------------------------------------------------------------
+# 4c. Assemble the base sector (sector 1) and write it
+# ---------------------------------------------------------------
+$baseSectorIndex = 1   # must match DTB: baseos,sector-number-extensions = <1>
+
+$sector = New-Object byte[] $SECTOR_SIZE   # zero-filled by default
+
+# offset 0: next_sector_number = -1 (no more chained sectors, for now)
+$nextSectorNumber = [uint64]::MaxValue
+[Array]::Copy([BitConverter]::GetBytes($nextSectorNumber), 0, $sector, 0, 8)
+# offset 8..31: reserved, left as zero
+
+# offset 32 onward: the meta_ext entries
+$writeOffset = 32
+[Array]::Copy($entry0,   0, $sector, $writeOffset, $entry0.Length);   $writeOffset += $entry0.Length
+[Array]::Copy($entry1,   0, $sector, $writeOffset, $entry1.Length);   $writeOffset += $entry1.Length
+[Array]::Copy($sentinel, 0, $sector, $writeOffset, $sentinel.Length)
+
+$baseOffsetBytes = [int64]$baseSectorIndex * $SECTOR_SIZE
+$stream = [System.IO.File]::Open($ssdPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write)
+$stream.Seek($baseOffsetBytes, [System.IO.SeekOrigin]::Begin) | Out-Null
+$stream.Write($sector, 0, $sector.Length)
+$stream.Close()
+
+Write-Host "  Wrote base sector (meta_ext table) to sector $baseSectorIndex (offset $baseOffsetBytes)" -ForegroundColor Green
 
 Write-Host "`nBuild OK." -ForegroundColor Green
 if ($NoRun) { return }

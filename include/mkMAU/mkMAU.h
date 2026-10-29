@@ -25,19 +25,13 @@ struct __attribute__((packed)) flattened_device_tree_header {
     uint32_t size_dt_struct;   /* Offset 0x24 */
 };
 
-typedef enum{
-    node_free = 1,
-    node_in_use =0
-}node_flag_t;
+
 
 struct mkmau_node{
     uint64_t base_range ;
     uint64_t end_range;
-    node_flag_t  if_free ;
-    size_t owner_pid ;
+    uint8_t  if_free ;  // 0 --> not free , 1 -- > free 
+    size_t pid ;
 };
-
-
-
 
 #endif
