@@ -59,6 +59,10 @@ struct hardware_info {
     uint32_t ssd_controller_extensions_uniq_id_array[10] ; 
     uint32_t ssd_controller_extensions_mapped_sector_array[25] ; 
 
+    uint32_t max_processes ; 
+
+    uint32_t min_mem_allocation  ; 
+
      };
 
   extern struct  hardware_info g_hw;

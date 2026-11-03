@@ -28,6 +28,22 @@
 
     baseos,sector-number-extensions = < 0xFFFFFFFF 1 0xFFFFFFFE> ;
 
+
+    /*
+      This below property is for user control , the user here tells how many processes can run on their chip or system ! 
+      This property is used for various runtime memory allocations structure which BaseOS is using for accurate memory allocations ! 
+      By default value of this property is 16 ! 
+    */
+
+    baseos,max-processes = <20> ; 
+
+    /*
+      The below value should be in bytes  , it is the minimum memory  ask of the extension which the user can set ! 
+      Note -- > In case of MMU , this value will be ignored because MMU works with 4kb of pages ! 
+    */
+
+    baseos,min-allocation-size = <4096> ; 
+
     interrupt-parent = <&gic0>;
 
     cpus {

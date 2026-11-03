@@ -13,7 +13,9 @@
 #include "../../include/lib/memcpy.h"
 #include "stddef.h"
 
-/* Minimum extension memory request should be this */
+/* Minimum extension memory request should be this
+Cause on basis of this value we are deciding the size of memory_tracker_array on runtime ! 
+*/
 #define MMAU_SIZE 4096  
 
 /* Fixed sizes for kernel buffer and SSD queue, replacing the old globals */

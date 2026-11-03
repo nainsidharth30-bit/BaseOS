@@ -139,6 +139,15 @@ uint8_t ic_index_array_count = 0 ;
   /* Here , This function traverse the Device tree blob using the FDT_NODE tokens and extract hardware specific Information !*/
 int extracting_dbt_info(uintptr_t dbt_tree_ptr , struct hardware_info *out_info )
 {
+
+  /*
+  Defalut values section ! 
+  */
+  out_info->max_processes=16 ; 
+
+
+
+
        /*  Extracting Reserved Regions Data from the RSV_MAP section */
        uart_puts("\n Extracting Reserved Regions Data from the RSV_MAP section \n");
         traverse_off_mem_rsvmap(dbt_tree_ptr,out_info);
@@ -673,6 +682,21 @@ If not → the node is something else (a device, a bus, memory, etc.)
   uniq_id_buffer=one_byte_tracker_pointer ; 
  }
 
+
+
+ if(str_eq(prop_name , "baseos,max-processes"))
+ {
+        out_info->max_processes = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer) ; 
+ }
+
+  
+ if(str_eq(prop_name , "baseos,min-allocation-size"))
+ {
+  /*
+  This value will be ignored in case of MMU because that always needs 4kb of  pages !
+  */
+  out_info->min_mem_allocation = __builtin_bswap32(*(uint32_t*)one_byte_tracker_pointer) ; 
+ }
 
 
 

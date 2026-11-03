@@ -6,8 +6,12 @@
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
 #include"../../include/interrupts/devices_setup.h"
+#include "../../include/mkMAU/mmu/root_pte.h"
 #include"../lib/memcpy.h"
 #include"../lib/setzero.h"
+#include "../../include/mkMAU/mmu/bitmap.h"
+#include "../../include/mkMAU/mmu/populate_bitmap.h"
+#include"../../include/mkMAU/page_collect.h"
 
 
 struct hardware_info g_hw = {0} ;
@@ -140,21 +144,6 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 /* Step --> Done ! */
 
 
-       /*  
-   ARCHITECTURAL DECISION ----->
-         The memory which is used by the kernel ( like reserved regions , buffers , SSD Queue , Kernel itself) 
-         must be completely invisible to the extensions so that they cannot acccessa any such memory ! 
-         More importantly as I am making the BaseOS for all RISC based chips and it does hardweare discovery on runtime hence many things are being built on runtime to prevent memory overhead 
-         For example , our memory_tracker_array stores mkMAU nodes which stores range of the region and a flag whether it is free or not , to track memory ! 
-         I am not building it on compile time or static time because that will remain as a fixed length ! 
-         Rule ---> if extension is asking memory than it must ask for atleast 4kb of memory in every request ! 
-         Chips with lot of Ram needs a bigger such array and chips with very smaller ram needs smaller array , hence I did one thing , I calculate the available ram by 
-         Total RAM - (kernel_static_size + kernel_buffer+SSD_QUEUE +...) , than I divide this value to sizeof(mkmau_node) , this way we get maximum number of nodes needed to track whole ram , 
-         than I made a memory_trtacker_array pointer of type mkmau_node and using that to track memory ! 
-         As all these things are happening on runtime , hence I am managing every byte of memory by myself inside the mkMAU_main function ! 
-   */
-      
-       mkMAU_main(&g_hw, x1_register) ;
  
 
        /*
@@ -165,6 +154,78 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
        if(g_hw.mem_sec==2)
        {
         uart_puts("Its MMU ! DO Paging ");
+
+        /*
+          Step -- > 1 
+           We need to make a bitmap , whose every indexed bit will represent that indexed 4kb page in RAM ! 
+           So we need to accolacte some space for the bitmap ! 
+        */
+
+        uintptr_t bitmap =0; 
+
+
+     uint32_t size_of_bitmap =    make_bitmap(g_hw.ram_size , &g_hw , &bitmap) ; 
+
+
+
+       // Filling the whole bitmap before populating it , 0xFF means every bit is 1 , that is every page is free ! 
+     uint8_t* bitmap_bytes = (uint8_t*)bitmap ; 
+     uint8_t  fill_value = 0xFF ; 
+
+     for(uint32_t b = 0 ; b < size_of_bitmap ; b++)
+     {
+         bitmap_bytes[b] = fill_value ; 
+     }
+
+
+     /*
+       Step --> 2 
+       Now we have to populate the Bitmap but before that we need to collect all those pages which covers the reserved regions , the kernel range and the bitmap itself also ! 
+     */
+
+     uint32_t base_page =0 ; 
+
+     // Marking the reserved regions first ! 
+
+     for(int i =0 ; i<g_hw.rsv_count ; i++)
+     {
+   uint32_t total_continous_pages =      page_collect(g_hw.rsv_regions[i].start , g_hw.rsv_regions[i].end ,&base_page , g_hw.min_mem_allocation , g_hw.ram_base_address,g_hw.ram_base_address+g_hw.ram_size ) ; 
+
+      for(uint32_t j =0 ; j<total_continous_pages ; j++)
+      {
+        uint64_t arr[1] ; 
+        arr[0] = base_page+ j ; 
+         populate_bitmap(bitmap , size_of_bitmap ,arr , 1 , 0 ) ; 
+      }
+
+     }
+
+     // Marking the kernel 
+
+     uint32_t total_continous_pages =  page_collect(kernel_start, kernel_end ,&base_page , g_hw.min_mem_allocation , g_hw.ram_base_address,g_hw.ram_base_address+g_hw.ram_size ) ; 
+
+      for(uint32_t j =0 ; j<total_continous_pages ; j++)
+      {
+        uint64_t arr[1] ; 
+        arr[0] = base_page+ j ; 
+         populate_bitmap(bitmap , size_of_bitmap ,arr , 1 , 0 ) ; 
+      }
+
+      // Marking the bitmap now 
+
+      total_continous_pages =  page_collect(bitmap, bitmap+size_of_bitmap ,&base_page , g_hw.min_mem_allocation , g_hw.ram_base_address,g_hw.ram_base_address+g_hw.ram_size ) ; 
+
+      for(uint32_t j =0 ; j<total_continous_pages ; j++)
+      {
+        uint64_t arr[1] ; 
+        arr[0] = base_page+ j ; 
+         populate_bitmap(bitmap , size_of_bitmap ,arr , 1 , 0 ) ; 
+      }
+
+
+
+        // making_root_pte_array();
+
            
        }
        else if(g_hw.mem_sec==1)

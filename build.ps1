@@ -98,7 +98,11 @@ $sources = @(
     "src/interrupts/arm_pl190_vic.c",
     "src/driverCode/ahci.c",
     "src/interrupts/enable_irq.c",
-    "src/interrupts/devices_setup.c"
+    "src/interrupts/devices_setup.c",
+    "src/mkMAU/mmu/bitmap.c",
+    "src/mkMAU/page_collect.c",
+    "src/mkMAU/mmu/populate_bitmap.c"
+
 )
 
 Write-Host "Compiling..." -ForegroundColor Cyan
