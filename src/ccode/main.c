@@ -1,12 +1,11 @@
 #include "../../include/driverHeaders/uart.h"
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
-#include "../../include/mkMAU/mkMAU.h"
 #include "../../include/driverHeaders/peripheral_struct.h"
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
 #include"../../include/interrupts/devices_setup.h"
-#include "../../include/mkMAU/mmu/root_pte.h"
+#include"../../include/mkMAU/mmu/root_pte.h"
 #include"../lib/memcpy.h"
 #include"../lib/setzero.h"
 #include "../../include/mkMAU/mmu/bitmap.h"
