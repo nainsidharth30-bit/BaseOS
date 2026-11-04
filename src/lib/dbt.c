@@ -3,14 +3,13 @@
 #include "../../include/lib/quicksort.h"
 #include "../../include/lib/setzero.h"
 #include "../../include/lib/memcpy.h"
-#include "../../include/mkMAU/mkMAU.h"
 #include<string.h>
 #include "../../include/driverHeaders/uart.h"
 #include "../../include/lib/alignbyte.h"
 #include "../../include/driverHeaders/track_stack.h"
 #include "../../include/driverHeaders/queue_address.h"
-#include "../../include/lib/compare_start_address.h"
 #include "../../include/string_utility.h"
+#include"../../include/mkMAU/mkmau_utils.h"
 
 
 #include"../interrupts/arm_cortex_a15_gic.h"

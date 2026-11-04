@@ -223,9 +223,21 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
 
 
-        // making_root_pte_array();
+     /*
+      Step --> 3 
+      Now using the max_processes , we need to allocate some space for the root_pte_array
+     */
 
-           
+     root_pte_array_setup(&g_hw,bitmap,size_of_bitmap) ; 
+
+     /*
+     Step --> 4 
+     Our root_pte_array is set , now we need to allocate a page of min_mem_allocation(4096) bytes size and put address or index of that page inside the root_pte_array  with pid as 0 
+     which signifies the kernel ! 
+     */
+
+     root_pte_set_kernel(bitmap,size_of_bitmap) ; 
+          
        }
        else if(g_hw.mem_sec==1)
        {
