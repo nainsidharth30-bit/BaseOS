@@ -11,6 +11,7 @@ struct root_pte_entry{
    uint32_t pid ; 
 } ; 
 
-uint16_t making_root_pte_array() ; 
+void root_pte_array_setup(struct hardware_info* out_info , uintptr_t bitmap , uint32_t size_bitmap ) ; 
+void root_pte_set_kernel(uintptr_t bitmap , uint32_t size_bitmap ) ; 
 
 #endif
