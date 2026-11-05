@@ -237,6 +237,12 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
      */
 
      root_pte_set_kernel(bitmap,size_of_bitmap) ; 
+
+     /*
+       Step --> 5
+       Our root page table entry is ready for our kernel  , 
+       Now we need to idenity map the whole RAM for our kernel ! 
+     */
           
        }
        else if(g_hw.mem_sec==1)
