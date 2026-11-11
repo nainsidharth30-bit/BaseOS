@@ -12,19 +12,11 @@ Every attribute below is stored in its own uint8_t for easy use , a function pac
 
 struct page_table_entry_attributes{
 
-    uint8_t valid_bit ;          // 1 bit  --> bit 0 
-                                 // Purpose : 1 = entry is real and MMU uses it , 0 = entry is empty and any access faults ! 
-                                 // Mapping function sets this automatically to 1 !
 
-    uint8_t type_bit ;           // 1 bit  --> bit 1 
-                                 // Purpose : at level 3 it must be 1 and it means "this entry is a page" ! ( at level 0 to 2 , 1 means "points to next table" ) 
-                                 // Mapping function sets this automatically to 1 ! 
+
 
     uint8_t memory_type ;        // 3 bits --> bits 2 to 4 
                                  // Purpose : index ( 0 to 7 ) into MAIR_EL1 register which tells the memory kind , our rule : 0 = normal RAM , 1 = device memory ( MMIO ) ! 
-
-    uint8_t non_secure_bit ;     // 1 bit  --> bit 5 
-                                 // Purpose : secure or non secure world selection , we leave this 0 ! 
 
     uint8_t user_access ;        // 1 bit  --> bit 6 ( AP[1] ) 
                                  // Purpose : 1 = user ( EL0 ) can access this page , 0 = only kernel can access ! 
@@ -48,7 +40,7 @@ struct page_table_entry_attributes{
     */
 
     uint8_t contiguous_hint ;    // 1 bit  --> bit 52 
-                                 // Purpose : hint that this entry is part of a group of contiguous entries , we leave this 0 ! 
+                                 // Purpose : hint that this entry is part of a group of contiguous entries 
 
     uint8_t no_execute_kernel ;  // 1 bit  --> bit 53 ( PXN ) 
                                  // Purpose : 1 = kernel ( EL1 ) is not allowed to run code from this page , 0 = allowed ! 
@@ -65,6 +57,8 @@ struct page_table_entry_attributes{
 
 } ;
 
+
+void pte_population( uintptr_t ram_base, uint64_t root_page_table_index, uint64_t virtual_address, uint64_t page_attributes_register, uint32_t min_mem_alloaction, uintptr_t bitmap, uint32_t size_bitmap ) ; 
 
 
 #endif

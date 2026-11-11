@@ -11,6 +11,7 @@
 #include "../../include/mkMAU/mmu/bitmap.h"
 #include "../../include/mkMAU/mmu/populate_bitmap.h"
 #include"../../include/mkMAU/page_collect.h"
+#include "../../include/mkMAU/mmu/identity_map_kernel.h"
 
 
 struct hardware_info g_hw = {0} ;
@@ -228,7 +229,7 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
       Now using the max_processes , we need to allocate some space for the root_pte_array
      */
 
-     root_pte_array_setup(&g_hw,bitmap,size_of_bitmap) ; 
+   struct root_pte_entry* root_pte_array =   root_pte_array_setup(&g_hw,bitmap,size_of_bitmap) ; 
 
      /*
      Step --> 4 
@@ -236,13 +237,24 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
      which signifies the kernel ! 
      */
 
-     root_pte_set_kernel(bitmap,size_of_bitmap) ; 
+     root_pte_set_kernel(&g_hw , bitmap , size_of_bitmap) ;  
 
      /*
        Step --> 5
        Our root page table entry is ready for our kernel  , 
        Now we need to idenity map the whole RAM for our kernel ! 
      */
+
+     identity_map_kernel(&g_hw , bitmap , size_of_bitmap , root_pte_array) ; 
+
+        
+     /*
+        Step --> 6 
+        Turn The MMU on and give the root page table of the kernel to the MMU ! 
+     */
+   
+
+     
           
        }
        else if(g_hw.mem_sec==1)

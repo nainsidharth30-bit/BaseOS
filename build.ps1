@@ -101,7 +101,9 @@ $sources = @(
     "src/interrupts/devices_setup.c",
     "src/mkMAU/mmu/bitmap.c",
     "src/mkMAU/page_collect.c",
-    "src/mkMAU/mmu/populate_bitmap.c"
+    "src/mkMAU/mmu/populate_bitmap.c",
+    "src/mkMAU/mmu/pte_populate.c", 
+    "src/mkMAU/mmu/identity_map_kernel.c"
 
 )
 

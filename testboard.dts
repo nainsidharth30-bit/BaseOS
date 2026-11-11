@@ -23,7 +23,7 @@
     /*
     Stores the sector numbers in sequential order where the metadata of the extensions is placed , the sectors will be read in strict sequential order so it is the user work to give proper dtb 
       the value -1 here is the delimiter which tells the end!
-  and the value -2 represents the end of the block ! 
+  and the value -2 represents the end of the block !
     */
 
     baseos,sector-number-extensions = < 0xFFFFFFFF 1 0xFFFFFFFE> ;
@@ -86,6 +86,7 @@
         interrupt-parent = <&gic0>;
         interrupts = <0 1 4>;
         baseos,irq-priority = <0xC0>;
+        baseos,uniq-id = <3> ;
     };
 
     rtc@9010000 {
