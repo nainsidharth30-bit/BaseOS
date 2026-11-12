@@ -6,6 +6,8 @@
 #include"../../include/interrupts/enable_irq.h"
 #include"../../include/interrupts/devices_setup.h"
 #include"../../include/mkMAU/mmu/root_pte.h"
+#include"../../include/mkMAU/mmu/mmu_on.h"
+#include"../../include/mkMAU/mmu/set_root_page_table_mmu.h"
 #include"../lib/memcpy.h"
 #include"../lib/setzero.h"
 #include "../../include/mkMAU/mmu/bitmap.h"
@@ -250,12 +252,21 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
         
      /*
         Step --> 6 
-        Turn The MMU on and give the root page table of the kernel to the MMU ! 
+        give the root page table of the kernel to the MMU ! and turn MMU on ! 
      */
-   
 
-     
-          
+     for(int i =0 ; i<g_hw.max_processes ; i++)
+     {
+      if(root_pte_array[i].pid==0)
+      {
+          set_root_page_table_mmu(g_hw.ram_base_address+root_pte_array[i].page_index*g_hw.min_mem_allocation) ; 
+          break;
+      }
+     }
+
+     turn_mmu_on() ; 
+    
+        
        }
        else if(g_hw.mem_sec==1)
        {
@@ -265,6 +276,12 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
        {
         uart_puts("Its None ! ") ; 
        }
+
+
+       /*
+        Step -- >
+        Now , we must fetch those extensions out whose load at boot is 1 (True) and extension tye is 0 --> extension is an SSD Driver   ! 
+       */
       
     
     

@@ -103,7 +103,10 @@ $sources = @(
     "src/mkMAU/page_collect.c",
     "src/mkMAU/mmu/populate_bitmap.c",
     "src/mkMAU/mmu/pte_populate.c", 
-    "src/mkMAU/mmu/identity_map_kernel.c"
+    "src/mkMAU/mmu/identity_map_kernel.c",
+    "src/mkMAU/mmu/set_root_page_table_mmu.c",
+    "src/mkMAU/mmu/mmu_on.c"
+    
 
 )
 
@@ -142,14 +145,13 @@ Write-Host "Image built at $($img.LastWriteTime)  ($($img.Length) bytes)" -Foreg
 #      offset 0   : next_sector_number (uint64, LE) = 0xFFFFFFFFFFFFFFFF -> no more sectors
 #      offset 8   : 24 bytes reserved, zero-filled
 #      offset 32  : meta_ext entry[0]  (first_extension)
-#      offset 121 : meta_ext entry[1]  (second_extension)
-#      offset 210 : sentinel meta_ext entry, uniq_id = 0xFFFFFFFF -> "no more entries"
+#      offset 121 : sentinel meta_ext entry, uniq_id = 0xFFFFFFFF -> "no more entries"
 #      rest       : zero-filled up to 512
 #
 #    meta_ext on-disk layout (PACKED, 89 bytes total -- the C struct
 #    MUST be declared __attribute__((packed)) or offsets will not match):
 #      [0 .. 63]   extension_name   (64 bytes, ASCII, zero-padded)
-#      [64.. 67]   extension_type   (uint32, LE)
+#      [64.. 67]   extension_type   (uint32, LE)  -- 0 = SSD driver
 #      [68]        load_at_boot_extension (uint8)
 #      [69..76]    sector_number    (uint64, LE)  -- where the extension's raw bytes start
 #      [77..80]    byte_offset      (uint32, LE)  -- always 0 for now
@@ -196,13 +198,11 @@ function Write-ExtensionToSector {
 }
 
 # ---------------------------------------------------------------
-# 4a. Flash the two actual extensions to their data sectors
+# 4a. Flash the first extension (the SSD driver) to its data sector
 # ---------------------------------------------------------------
 $firstSector  = 1024
-$secondSector = 2048
 
 $firstSize  = Write-ExtensionToSector "first_extension.bin"  "first"  $ssdPath $SECTOR_SIZE $firstSector
-$secondSize = Write-ExtensionToSector "second_extension.bin" "second" $ssdPath $SECTOR_SIZE $secondSector
 
 # ---------------------------------------------------------------
 # 4b. Build one packed meta_ext entry (89 bytes) as raw bytes
@@ -236,15 +236,12 @@ function New-MetaExtEntry {
     return $buf
 }
 
-# extension_type: 1 = Driver (per your own convention). Adjust per-extension if needed.
+# extension_type: 0 = SSD driver (BaseOS rule).
 # load_at_boot:   1 = yes, autoload at boot.
 # uniq_id:        1  (matches DTB: baseos,uniq-id = <1> on the virtio_block node)
 
-$entry0 = New-MetaExtEntry -Name "first_extension"  -Type 1 -LoadAtBoot 1 `
+$entry0 = New-MetaExtEntry -Name "first_extension"  -Type 0 -LoadAtBoot 1 `
             -SectorNumber $firstSector  -ByteOffset 0 -SizeOfExtension $firstSize  -UniqId 1
-
-$entry1 = New-MetaExtEntry -Name "second_extension" -Type 1 -LoadAtBoot 0 `
-            -SectorNumber $secondSector -ByteOffset 0 -SizeOfExtension $secondSize -UniqId 1
 
 # Sentinel entry: uniq_id = 0xFFFFFFFF marks "no more entries in this sector"
 # NOTE: on Windows PowerShell 5.1, the hex literal 0xFFFFFFFF is parsed as a
@@ -268,7 +265,6 @@ $nextSectorNumber = [uint64]::MaxValue
 # offset 32 onward: the meta_ext entries
 $writeOffset = 32
 [Array]::Copy($entry0,   0, $sector, $writeOffset, $entry0.Length);   $writeOffset += $entry0.Length
-[Array]::Copy($entry1,   0, $sector, $writeOffset, $entry1.Length);   $writeOffset += $entry1.Length
 [Array]::Copy($sentinel, 0, $sector, $writeOffset, $sentinel.Length)
 
 $baseOffsetBytes = [int64]$baseSectorIndex * $SECTOR_SIZE
