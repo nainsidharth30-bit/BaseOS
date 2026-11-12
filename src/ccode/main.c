@@ -280,7 +280,7 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
        /*
         Step -- >
-        Now , we must fetch those extensions out whose load at boot is 1 (True) and extension tye is 0 --> extension is an SSD Driver   ! 
+        Now , we need to fetch the user SSD Driver , so we  do need to fetch the meta ext array and find those extensions whose load at boot is 1 and device type is 0 , 0 means its a ssd driver !
        */
       
     

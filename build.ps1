@@ -142,10 +142,11 @@ Write-Host "Image built at $($img.LastWriteTime)  ($($img.Length) bytes)" -Foreg
 #    Layout rules (must match the C-side meta_ext parser exactly):
 #
 #    Sector 1 (base sector, from DTB: baseos,sector-number-extensions = <1>)
-#      offset 0   : next_sector_number (uint64, LE) = 0xFFFFFFFFFFFFFFFF -> no more sectors
-#      offset 8   : 24 bytes reserved, zero-filled
-#      offset 32  : meta_ext entry[0]  (first_extension)
-#      offset 121 : sentinel meta_ext entry, uniq_id = 0xFFFFFFFF -> "no more entries"
+#      offset 0   : size_of_meta_ext_array (uint64, LE) -- total bytes of the meta_ext array
+#                   that follows, INCLUDING the sentinel entry, NOT counting these 8 bytes.
+#                   The kernel uses it to know how much space to reserve.
+#      offset 8   : meta_ext entry[0]  (first_extension)   -- base of the meta_ext array
+#      offset 97  : sentinel meta_ext entry, uniq_id = 0xFFFFFFFF -> "no more entries"
 #      rest       : zero-filled up to 512
 #
 #    meta_ext on-disk layout (PACKED, 89 bytes total -- the C struct
@@ -257,13 +258,12 @@ $baseSectorIndex = 1   # must match DTB: baseos,sector-number-extensions = <1>
 
 $sector = New-Object byte[] $SECTOR_SIZE   # zero-filled by default
 
-# offset 0: next_sector_number = -1 (no more chained sectors, for now)
-$nextSectorNumber = [uint64]::MaxValue
-[Array]::Copy([BitConverter]::GetBytes($nextSectorNumber), 0, $sector, 0, 8)
-# offset 8..31: reserved, left as zero
+# offset 0: size of the meta_ext array in bytes (all entries + the sentinel)
+$metaArraySize = [uint64]($entry0.Length + $sentinel.Length)
+[Array]::Copy([BitConverter]::GetBytes($metaArraySize), 0, $sector, 0, 8)
 
-# offset 32 onward: the meta_ext entries
-$writeOffset = 32
+# offset 8 onward: the meta_ext array itself (base of the array)
+$writeOffset = 8
 [Array]::Copy($entry0,   0, $sector, $writeOffset, $entry0.Length);   $writeOffset += $entry0.Length
 [Array]::Copy($sentinel, 0, $sector, $writeOffset, $sentinel.Length)
 
@@ -273,7 +273,7 @@ $stream.Seek($baseOffsetBytes, [System.IO.SeekOrigin]::Begin) | Out-Null
 $stream.Write($sector, 0, $sector.Length)
 $stream.Close()
 
-Write-Host "  Wrote base sector (meta_ext table) to sector $baseSectorIndex (offset $baseOffsetBytes)" -ForegroundColor Green
+Write-Host "  Wrote base sector (meta_ext table, array size = $metaArraySize bytes) to sector $baseSectorIndex (offset $baseOffsetBytes)" -ForegroundColor Green
 
 Write-Host "`nBuild OK." -ForegroundColor Green
 if ($NoRun) { return }
