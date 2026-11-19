@@ -1,6 +1,7 @@
 #include "../../include/driverHeaders/uart.h"
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
+#include "../../include/lib/fetch_ssd_drivers_ext.h"
 #include "../../include/driverHeaders/peripheral_struct.h"
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
@@ -15,8 +16,17 @@
 #include"../../include/mkMAU/page_collect.h"
 #include "../../include/mkMAU/mmu/identity_map_kernel.h"
 
+#define META_EXT_ARRAY_SIZE 15 
+
 
 struct hardware_info g_hw = {0} ;
+/*
+This array stores the three pairs which makes one single dataset information for one single meta ext array ! 
+first slot stores the base address of that meta ext array , next one store size of that meta ext array and next one stores the uniq id of the ssd controller , so now its a pair of 3 actuyally ! 
+*/
+uint64_t meta_ext_address_size_pair_array[META_EXT_ARRAY_SIZE] ; 
+
+uint8_t meta_ext_address_size_pair_array_count =0 ;
 
 
 
@@ -265,6 +275,14 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
      }
 
      turn_mmu_on() ; 
+
+     /*
+     Step --> 
+     Now we must fetch the ssd controller drivers made by the user , using the k-drivers (kernel level polling basded very simple ssd drivers ) 
+     */
+
+     
+       fetch_ssd_drivers_extensions(&g_hw , ssd_index_array , ssd_index_array_count , bitmap , size_of_bitmap ) ; 
     
         
        }
@@ -278,10 +296,12 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
        }
 
 
-       /*
-        Step -- >
-        Now , we need to fetch the user SSD Driver , so we  do need to fetch the meta ext array and find those extensions whose load at boot is 1 and device type is 0 , 0 means its a ssd driver !
-       */
+    
+
+
+
+
+   
       
     
     

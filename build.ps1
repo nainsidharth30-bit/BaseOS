@@ -105,7 +105,8 @@ $sources = @(
     "src/mkMAU/mmu/pte_populate.c", 
     "src/mkMAU/mmu/identity_map_kernel.c",
     "src/mkMAU/mmu/set_root_page_table_mmu.c",
-    "src/mkMAU/mmu/mmu_on.c"
+    "src/mkMAU/mmu/mmu_on.c" , 
+    "src/lib/fetch_ssd_drivers_ext.c"
     
 
 )

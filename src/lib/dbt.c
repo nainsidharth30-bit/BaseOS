@@ -409,6 +409,10 @@ static const struct ssd_compatible_entry ssd_compatibles[] = {
 
 
 
+    out_info->ssd_controller_extensions_mapped_sector_array_size = 25 ; 
+    out_info->ssd_controller_extensions_uniq_id_array_size = 10 ; 
+
+
       
 
        //  -------- FLAG SECTION  ---------------------//
