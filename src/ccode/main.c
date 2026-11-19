@@ -1,7 +1,7 @@
 #include "../../include/driverHeaders/uart.h"
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
-#include "../../include/lib/fetch_ssd_drivers_ext.h"
+#include "../../include/lib/fetch_meta_ext_arrays.h"
 #include "../../include/driverHeaders/peripheral_struct.h"
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
@@ -278,11 +278,18 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
      /*
      Step --> 
-     Now we must fetch the ssd controller drivers made by the user , using the k-drivers (kernel level polling basded very simple ssd drivers ) 
+     We will fetch the meta-ext arrays now , out of SSD , so that later we can use them in any way we want !
      */
 
      
-       fetch_ssd_drivers_extensions(&g_hw , ssd_index_array , ssd_index_array_count , bitmap , size_of_bitmap ) ; 
+       fetch_meta_ext_arrays(&g_hw , ssd_index_array , ssd_index_array_count , bitmap , size_of_bitmap ) ; 
+
+
+    /*
+    Step --> 
+    Before fetching user made ssd drivers , we must build processes , instead its a very common and important step that before loading any extension inside the RAM , the kernel must
+    should ready the process id  , extension type , root page table entry for that and more things !
+    */   
     
         
        }

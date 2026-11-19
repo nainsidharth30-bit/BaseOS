@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "../../include/lib/fetch_ssd_drivers_ext.h"
+#include "../../include/lib/fetch_meta_ext_arrays.h"
 #include "../../include/lib/dbt.h"
 #include "../../include/lib/setzero.h"
 #include "../../include/mkMAU/mkmau_utils.h"
@@ -37,7 +37,7 @@ void    fetch_meta_ext_for_device(struct device_entry* device , struct periphera
 
 
 
-void fetch_ssd_drivers_extensions(struct hardware_info * out_info , uint16_t* ssd_index_array , uint8_t ssd_index_array_count , uintptr_t bitmap , uint32_t size_bitmap )
+void fetch_meta_ext_arrays(struct hardware_info * out_info , uint16_t* ssd_index_array , uint8_t ssd_index_array_count , uintptr_t bitmap , uint32_t size_bitmap )
 {
 
    uart_puts("\n Hello I am fetching SSD DRIVERS , k-drivers\n") ; 
