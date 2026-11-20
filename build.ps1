@@ -106,7 +106,8 @@ $sources = @(
     "src/mkMAU/mmu/identity_map_kernel.c",
     "src/mkMAU/mmu/set_root_page_table_mmu.c",
     "src/mkMAU/mmu/mmu_on.c" , 
-    "src/lib/fetch_meta_ext_arrays.c"
+    "src/lib/fetch_meta_ext_arrays.c",
+    "src/mkMAU/mmu/set_stage.c"
     
 
 )

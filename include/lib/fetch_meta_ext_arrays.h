@@ -2,6 +2,7 @@
 #define FETCH_EXT_DRIVERS_H 
 
 #include "dbt.h"
+#include<stdint.h>
 
 
 void fetch_meta_ext_arrays(struct hardware_info * out_info , uint16_t* ssd_index_array , uint8_t ssd_index_array_count , uintptr_t bitmap , uint32_t size_bitmap   ) ; 
@@ -13,6 +14,8 @@ uint32_t size  ;
 uint32_t uniq_id  ; 
 
 } ; 
+
+ 
 
 
 #endif

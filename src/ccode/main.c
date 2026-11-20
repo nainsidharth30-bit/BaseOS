@@ -2,6 +2,7 @@
 #include<stdint.h>
 #include "../../include/lib/dbt.h"
 #include "../../include/lib/fetch_meta_ext_arrays.h"
+#include "../../include/lib/k_drivers.h"
 #include "../../include/driverHeaders/peripheral_struct.h"
 #include "../../include/interrupts/ic_bpt.h"
 #include"../../include/interrupts/enable_irq.h"
@@ -17,6 +18,7 @@
 #include "../../include/mkMAU/mmu/identity_map_kernel.h"
 
 #define META_EXT_ARRAY_SIZE 15 
+#define K_DRIVER_ARRAY_SIZE 5 
 
 
 struct hardware_info g_hw = {0} ;
@@ -27,6 +29,16 @@ first slot stores the base address of that meta ext array , next one store size 
 uint64_t meta_ext_address_size_pair_array[META_EXT_ARRAY_SIZE] ; 
 
 uint8_t meta_ext_address_size_pair_array_count =0 ;
+
+/*
+This variable gives us the very last assigned pid to any process ! 
+*/
+uint32_t last_assigned_pid = 0 ; 
+
+
+struct k_driver_entry  k_driver_array[K_DRIVER_ARRAY_SIZE] ; 
+
+uint8_t k_driver_array_count = 0 ; 
 
 
 
@@ -242,6 +254,7 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
      */
 
    struct root_pte_entry* root_pte_array =   root_pte_array_setup(&g_hw,bitmap,size_of_bitmap) ; 
+   uint32_t root_pte_array_count = 0 ; 
 
      /*
      Step --> 4 
@@ -250,6 +263,7 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
      */
 
      root_pte_set_kernel(&g_hw , bitmap , size_of_bitmap) ;  
+     root_pte_array++ ; 
 
      /*
        Step --> 5
@@ -276,6 +290,15 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
      turn_mmu_on() ; 
 
+
+     /*
+      Step -->
+      Setting up the k-drivers , allocating them one queue and one buffer and populating our k_driver_array ! 
+     */
+
+     set_k_drivers(ssd_index_array , ssd_index_array_count , &g_hw , bitmap , size_of_bitmap) ; 
+
+
      /*
      Step --> 
      We will fetch the meta-ext arrays now , out of SSD , so that later we can use them in any way we want !
@@ -287,9 +310,10 @@ set_zero(&ic_bpt_node, sizeof(struct ic_bpt));
 
     /*
     Step --> 
-    Before fetching user made ssd drivers , we must build processes , instead its a very common and important step that before loading any extension inside the RAM , the kernel must
-    should ready the process id  , extension type , root page table entry for that and more things !
+         now , we need to iterate over the meta-ext arrays and find those extensions whose load at boot is 1 and device type is 0 because that means extensions are ssd drivers ! 
     */   
+
+    
     
         
        }
